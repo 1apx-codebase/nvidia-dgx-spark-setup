@@ -48,7 +48,7 @@ cd llama.cpp
 > **Note:** `~/codebase/llama.cpp/` is a live upstream clone. Pull regularly to get the latest
 > quantisation support, bug fixes, and new CUDA kernels.
 
-The binary installed as of this documentation was built from commit `1a29907`.
+The binary installed as of this documentation was built from commit `1a29907` with the full optimised flag set documented in Section 2.
 
 ---
 
@@ -95,6 +95,7 @@ The build outputs binaries to `~/codebase/llama.cpp/build/bin/`. The primary bin
 `~/codebase/llama.cpp/build/bin/llama-server`.
 
 > Build time is approximately 10–15 minutes on the GB10 with LTO enabled.
+> The currently installed binary (`/usr/local/bin/llama-server`, 6.6 MB, built 2026-06-23) was compiled with all flags above.
 
 ---
 
@@ -110,7 +111,7 @@ Verify:
 
 ```bash
 /usr/local/bin/llama-server --version
-ls -lh /usr/local/bin/llama-server   # ~6.8 MB
+ls -lh /usr/local/bin/llama-server   # ~6.6 MB (LTO reduces binary size)
 ```
 
 ---

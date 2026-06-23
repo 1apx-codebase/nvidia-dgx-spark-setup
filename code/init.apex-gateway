@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# =============================================================================
+# init.apex-gateway — APEX Gateway Service Manager
+# Manages the apex-gateway.service systemd unit
+# =============================================================================
+# Usage: init.apex-gateway <command>
+#
+# Commands:
+#   start    Start the apex-gateway service
+#   stop     Stop the apex-gateway service
+#   restart  Restart the apex-gateway service
+#   reload   Reload systemd daemon and restart the service
+#   status   Show service status and recent logs
+#   help     Show this help message
+# =============================================================================
+
+set -euo pipefail
+
+SERVICE="apex-gateway.service"
+
+# ── Colour palette ────────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
+success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
+die()     { error "$*"; exit 1; }
+
+separator() {
+    echo -e "${CYAN}$(printf '─%.0s' {1..60})${RESET}"
+}
+
+require_systemctl() {
+    command -v systemctl &>/dev/null || die "systemctl not found."
+}
+
+# ── Usage ─────────────────────────────────────────────────────────────────────
+usage() {
+    echo -e ""
+    echo -e "${BOLD}init.apex-gateway${RESET} — APEX Gateway Service Manager"
+    echo -e ""
+    echo -e "${BOLD}USAGE${RESET}"
+    echo -e "  init.apex-gateway <command>"
+    echo -e ""
+    echo -e "${BOLD}COMMANDS${RESET}"
+    echo -e "  start     Start the apex-gateway service"
+    echo -e "  stop      Stop the apex-gateway service"
+    echo -e "  restart   Restart the apex-gateway service"
+    echo -e "  reload    Reload systemd daemon then restart the service"
+    echo -e "  status    Show service status and recent logs"
+    echo -e "  help      Show this help message"
+    echo -e ""
+    echo -e "${BOLD}EXAMPLES${RESET}"
+    echo -e "  init.apex-gateway start"
+    echo -e "  init.apex-gateway stop"
+    echo -e "  init.apex-gateway restart"
+    echo -e "  init.apex-gateway reload"
+    echo -e "  init.apex-gateway status"
+    echo -e ""
+}
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+cmd_start() {
+    info "Starting ${SERVICE}…"
+    sudo systemctl start "$SERVICE" \
+        && success "Service started." \
+        || die "Failed to start ${SERVICE}."
+    separator
+    cmd_status
+}
+
+cmd_stop() {
+    info "Stopping ${SERVICE}…"
+    sudo systemctl stop "$SERVICE" \
+        && success "Service stopped." \
+        || die "Failed to stop ${SERVICE}."
+}
+
+cmd_restart() {
+    info "Restarting ${SERVICE}…"
+    sudo systemctl restart "$SERVICE" \
+        && success "Service restarted." \
+        || die "Failed to restart ${SERVICE}."
+    separator
+    cmd_status
+}
+
+cmd_reload() {
+    info "Reloading systemd daemon…"
+    sudo systemctl daemon-reload \
+        && success "Daemon reloaded." \
+        || die "Failed to reload systemd daemon."
+    info "Restarting ${SERVICE}…"
+    sudo systemctl restart "$SERVICE" \
+        && success "Service restarted." \
+        || die "Failed to restart ${SERVICE}."
+    separator
+    cmd_status
+}
+
+cmd_status() {
+    info "Status of ${SERVICE}:"
+    separator
+    sudo systemctl status "$SERVICE" --no-pager -l || true
+    separator
+    info "Recent logs:"
+    local since
+    since=$(systemctl show "$SERVICE" -p ActiveEnterTimestamp --value 2>/dev/null)
+    if [[ -n "$since" && "$since" != "n/a" ]]; then
+        sudo journalctl -u "$SERVICE" --since="$since" --no-pager || true
+    else
+        sudo journalctl -u "$SERVICE" -n 20 --no-pager || true
+    fi
+    separator
+}
+
+# ── Main dispatcher ───────────────────────────────────────────────────────────
+main() {
+    require_systemctl
+
+    local command="${1:-help}"
+    shift || true
+
+    case "$command" in
+        start)           cmd_start   ;;
+        stop)            cmd_stop    ;;
+        restart)         cmd_restart ;;
+        reload)          cmd_reload  ;;
+        status)          cmd_status  ;;
+        help|--help|-h)  usage       ;;
+        *)
+            error "Unknown command: '$command'"
+            usage; exit 1
+            ;;
+    esac
+}
+
+main "$@"

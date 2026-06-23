@@ -1,0 +1,253 @@
+# Open WebUI Installation Guide
+## NVIDIA DGX Spark (GB10)
+
+Open WebUI is a web-based chat interface for LLMs. On this machine it runs as a Docker container,
+pinned to a specific release tag, managed by a systemd service. It connects to llama-swap
+(the local model proxy) as its AI backend.
+
+- **Version:** v0.9.5
+- **Image:** `ghcr.io/open-webui/open-webui:v0.9.5`
+- **URL:** `http://<host-ip>:3000`
+- **Data volume:** Docker named volume `openwebui` → `/var/lib/docker/volumes/openwebui/_data`
+
+> **Before starting:** Install all required software listed in [`prerequisites.md`](prerequisites.md).
+
+---
+
+## Prerequisites
+
+- Docker installed and the `sysadmin` user in the `docker` group
+- llama-swap running on port 8080 (Open WebUI connects to it as the AI backend)
+- Log directory created before first start
+
+```bash
+# Verify Docker
+docker --version   # Docker version 29.2.1 or later
+
+# Verify user is in docker group
+groups | grep docker
+# If missing: sudo usermod -aG docker $USER && newgrp docker
+```
+
+---
+
+## 1. Create the Log Directory
+
+```bash
+sudo mkdir -p /var/log/openwebui
+sudo chown sysadmin:sysadmin /var/log/openwebui
+```
+
+---
+
+## 2. Pull the Image
+
+Pin to the exact version tag rather than `main` or `latest` to prevent unintended upgrades
+on service restarts.
+
+```bash
+docker pull ghcr.io/open-webui/open-webui:v0.9.5
+```
+
+Verify the image is present:
+
+```bash
+docker images ghcr.io/open-webui/open-webui
+```
+
+---
+
+## 3. Create the Docker Volume
+
+The named volume persists all user data (accounts, chat history, model configs, embeddings, etc.)
+across container restarts and upgrades.
+
+```bash
+docker volume create openwebui
+```
+
+Inspect to confirm location:
+
+```bash
+docker volume inspect openwebui
+# Mountpoint: /var/lib/docker/volumes/openwebui/_data
+```
+
+> **Important:** Never delete this volume. It contains all persistent state. Back it up before
+> upgrading the container image.
+
+---
+
+## 4. Systemd Unit — `/etc/systemd/system/openwebui.service`
+
+The service stops and removes the old container before each start so Docker can recreate it
+cleanly with the current configuration.
+
+```bash
+sudo tee /etc/systemd/system/openwebui.service > /dev/null << 'EOF'
+[Unit]
+Description=OpenWebUI Docker Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=sysadmin
+
+ExecStartPre=-/usr/bin/docker stop openwebui
+ExecStartPre=-/usr/bin/docker rm openwebui
+
+ExecStart=/usr/bin/docker run --name openwebui \
+    -p 3000:8080 \
+    -v openwebui:/app/backend/data \
+    ghcr.io/open-webui/open-webui:v0.9.5
+
+ExecStop=/usr/bin/docker stop openwebui
+ExecStopPost=/usr/bin/docker rm openwebui
+
+Restart=always
+RestartSec=10
+
+StandardOutput=append:/var/log/openwebui/openwebui.log
+StandardError=append:/var/log/openwebui/openwebui.log
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable openwebui.service
+sudo systemctl start openwebui.service
+sudo systemctl status openwebui.service
+```
+
+---
+
+## 5. Verify
+
+```bash
+# Container is running and healthy
+docker ps | grep openwebui
+docker inspect openwebui --format '{{.State.Health.Status}}'
+# → healthy  (takes ~60–90 seconds after first start)
+
+# API responds
+curl -s http://localhost:3000/api/version
+# → {"version":"0.9.5","deployment_id":""}
+
+# HTTP health endpoint
+curl -o /dev/null -w "%{http_code}" http://localhost:3000/health
+# → 200
+
+# Tail logs
+tail -f /var/log/openwebui/openwebui.log
+```
+
+---
+
+## 6. First-Run Setup
+
+On first launch, navigate to `http://<host-ip>:3000` in a browser and complete the setup wizard:
+
+1. Create the admin account (email + password).
+2. Open WebUI will redirect to the chat interface.
+
+### Connect to llama-swap
+
+Open WebUI connects to llama-swap as an OpenAI-compatible backend. Configure this in the admin panel:
+
+1. Go to **Admin Panel → Settings → Connections**.
+2. Under **OpenAI API**, set the base URL to `http://172.17.0.1:8080/v1`
+   (`172.17.0.1` is the Docker bridge gateway — how the container reaches the host).
+3. Set any non-empty API key (llama-swap does not validate keys).
+4. Save. The model list from llama-swap will populate automatically.
+
+### Set Context Windows per Model
+
+After connecting, set the context window for each model to match the llama-swap configuration.
+This can be done via script — see the admin API example below — or manually in the model editor.
+
+```bash
+# Example: set gpt-oss-120b to 131072 tokens via the admin API
+# First retrieve your API key from Admin Panel → Account → API Keys
+API_KEY="sk-..."
+
+curl -s -X POST "http://localhost:3000/api/v1/models/model/update?id=gpt-oss-120b" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"gpt-oss-120b","name":"gpt-oss-120B","base_model_id":null,"meta":{},"params":{"num_ctx":131072},"access_grants":[],"is_active":true}'
+```
+
+Refer to the context window table in `llama-swap.md` for per-model values.
+
+---
+
+## 7. Upgrading to a New Version
+
+1. Pull the new image:
+   ```bash
+   docker pull ghcr.io/open-webui/open-webui:vX.Y.Z
+   ```
+
+2. Update the image tag in the service file:
+   ```bash
+   sudo sed -i 's|open-webui:v.*|open-webui:vX.Y.Z|' /etc/systemd/system/openwebui.service
+   sudo systemctl daemon-reload
+   ```
+
+3. Restart the service:
+   ```bash
+   sudo systemctl restart openwebui.service
+   ```
+
+4. Confirm the running container uses the new image:
+   ```bash
+   docker inspect openwebui --format '{{.Config.Image}}'
+   curl -s http://localhost:3000/api/version
+   ```
+
+---
+
+## 8. Service Manager Script
+
+`/home/sysadmin/codebase/bin/init.openwebui` manages the service:
+
+```bash
+init.openwebui start
+init.openwebui stop
+init.openwebui restart
+init.openwebui reload    # daemon-reload then restart
+init.openwebui status
+```
+
+---
+
+## Key Paths
+
+| Path | Purpose |
+|---|---|
+| `/etc/systemd/system/openwebui.service` | Systemd unit |
+| `/var/log/openwebui/openwebui.log` | Log file |
+| `/var/lib/docker/volumes/openwebui/_data` | Persistent data (host path of named volume) |
+| `/app/backend/data` | Data path inside the container |
+
+---
+
+## Container Environment Notes
+
+The container runs Python 3.11 (upstream base image). Telemetry and analytics are disabled at
+build time (`SCARF_NO_ANALYTICS=true`, `DO_NOT_TRACK=true`, `ANONYMIZED_TELEMETRY=false`).
+The Ollama integration is disabled (`USE_OLLAMA_DOCKER=false`); the connection to llama-swap
+is configured via the OpenAI API endpoint in the admin UI.
+
+No GPU passthrough is required for the container — GPU inference is handled by llama-swap on
+the host; Open WebUI is CPU-only (serving the web UI and doing embeddings in software).

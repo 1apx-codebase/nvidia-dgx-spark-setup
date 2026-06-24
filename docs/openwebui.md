@@ -177,8 +177,7 @@ After connecting, set the context window for each model to match the llama-swap 
 This can be done via script — see the admin API example below — or manually in the model editor.
 
 ```bash
-# Example: set gpt-oss-120b to 131072 tokens via the admin API
-# First retrieve your API key from Admin Panel → Account → API Keys
+# Retrieve your API key from Admin Panel → Account → API Keys
 API_KEY="sk-..."
 
 curl -s -X POST "http://localhost:3000/api/v1/models/model/update?id=gpt-oss-120b" \
@@ -254,9 +253,7 @@ A successful response returns `{"status": true, "specs": [...]}` listing availab
 
 ### Currently Registered MCP Servers
 
-| Name | Endpoint | Tools | Guide |
-|---|---|---|---|
-| Brave Search | `http://192.168.1.45:8765/mcp` | `brave_web_search`, `brave_local_search` | [`brave-search.md`](brave-search.md) |
+None configured.
 
 ### Enabling Tools in a Chat
 
@@ -265,6 +262,22 @@ bottom of the input bar and toggle the desired tool on. The model will call it a
 when relevant.
 
 Via the API, pass `"tool_ids": ["server:mcp:<server-id>"]` in the request body.
+
+### Notes for MCP Tools
+
+**`function_calling: native` is required.** Open WebUI has two tool-calling modes:
+
+| Mode | How it works | Result |
+|---|---|---|
+| Default (non-native) | Injects tool specs as text into the prompt | Most models ignore this |
+| `function_calling: "native"` | Passes tools as OpenAI function definitions | Model makes proper tool calls |
+
+Without `function_calling: "native"` in the model's params, the model will never call MCP
+tools — it will answer from training data instead. Set this on every model that uses MCP servers.
+
+**`defaultFeatureIds` does not auto-enable MCP tools.** The `defaultFeatureIds` field controls
+built-in Open WebUI features (`web_search`, `code_interpreter`, `image_generation`). Adding an
+MCP tool ID here has no effect — MCP tools require the user to toggle them on per chat session.
 
 ---
 

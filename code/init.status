@@ -106,9 +106,6 @@ printf "${DIM}  ${THIN}${RESET}\n"
 print_service "apex-gateway"      "apex-gateway.service"     "8766" "" "skip"
 printf "${DIM}  ${THIN}${RESET}\n"
 print_service "llama-server"      "llama-server.service"     "10000" "http://localhost:10000/health"
-printf "${DIM}  ${THIN}${RESET}\n"
-print_service "mcp-brave-search"  "mcp-brave-search.service" "8765" "" "skip"
-
 printf "${CYAN}${LINE}${RESET}\n"
 
 # ── Loaded models ──────────────────────────────────────────────────────────────

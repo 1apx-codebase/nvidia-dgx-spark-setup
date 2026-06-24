@@ -105,7 +105,6 @@ pressure.
 | Model | Size | Notes |
 |---|---|---|
 | `gpt-oss-120b` | 120B MXFP4 | **Default — loads at startup.** 131K ctx, ~60 GB |
-| `Qwen3-235B-A22B` | 235B MoE Q4_K_M | Best overall quality; 32K ctx |
 | `Qwen2.5-Coder-32B` | 32B Q8_0 | Best for programming |
 | `DeepSeek-R1-70B` | 70B Q5_K_M | Strong reasoning and debugging |
 | `Qwen3-32B` | 32B Q8_0 | General purpose, high quality |

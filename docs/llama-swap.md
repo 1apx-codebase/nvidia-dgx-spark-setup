@@ -150,11 +150,6 @@ macros:
   # Memory management (safe for models ≤120B)
   args2: --no-mmap --cache-ram 32768 --defrag-thold 0.2
 
-  # Large MoE variant (235B+): drops --no-mmap, reduces KV quality, smaller batches
-  args_moe: --jinja --cont-batching --kv-unified --cache-type-k q4_0 --cache-type-v q4_0 \
-             --flash-attn on --batch-size 2048 --ubatch-size 512 --n-gpu-layers 99 \
-             --no-op-offload --threads 10 --threads-batch 20 --defrag-thold 0.2
-
 # ── Models ───────────────────────────────────────────────────────────────────
 models:
 
@@ -166,11 +161,6 @@ models:
     filters:
       setParams:
         reasoning_effort: high
-
-  Qwen3-235B-A22B:
-    cmd: ${latest-llama} ${args_moe} --ctx-size 32768 \
-         --model ${models_dir}/unsloth/Qwen3-235B-A22B-GGUF/Q4_K_M/Qwen3-235B-A22B-Q4_K_M-00001-of-00003.gguf
-    name: "Qwen3 235B A22B Q4_K_M"
 
   Qwen3-72B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
@@ -282,7 +272,6 @@ YAML
 | `${default_ctx}` | `128000` |
 | `${args1}` | Standard GB10 inference flags (threads, batching, KV cache, FlashAttn) |
 | `${args2}` | Memory flags: `--no-mmap` (full preload) + `--cache-ram 32768` (32 GiB prompt cache) |
-| `${args_moe}` | Large MoE variant: omits `--no-mmap`, uses q4_0 KV, smaller batches |
 
 ### args1 Flag Explanations
 
@@ -315,7 +304,6 @@ YAML
 |---|---|---|
 | `gpt-oss-120b` | 131072 | Model native maximum |
 | `gpt-oss-20b` | 32768 | Model native maximum |
-| `Qwen3-235B-A22B` | 32768 | Memory constraint: 235B weights + KV must fit 121 GiB |
 | `Qwen3-Coder-30B-Q6` | 65536 | Model trained to 64K only |
 | All others | 128000 (`${default_ctx}`) | 128K default; fits comfortably |
 

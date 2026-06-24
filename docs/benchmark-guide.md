@@ -70,7 +70,6 @@ curl -s http://localhost:8080/v1/models | python3 -m json.tool | grep '"id"'
 Example output:
 ```
 "id": "gpt-oss-120b",
-"id": "Qwen3-235B-A22B",
 "id": "Qwen3-72B",
 ...
 ```
@@ -164,7 +163,7 @@ llama-swap will load it during the warmup. Only the timed iterations are include
 **Models unload when another loads.**
 llama-swap manages memory automatically. Benchmarking multiple models in sequence will cause
 each to load and unload in turn. Allow extra time when using `--all` or benchmarking large
-models like `Qwen3-235B-A22B`.
+models like `Qwen3-72B`.
 
 **`gpt-oss-120b` uses extended thinking.**
 llama-swap injects `reasoning_effort: high` for every request to `gpt-oss-120b`. This means

@@ -10,6 +10,7 @@ Install everything here before following any individual installation guide.
 | `llama-swap.md` | Go, Git, Make, Miniforge/hf CLI (for model downloads) |
 | `openwebui.md` | Docker |
 | `apex-gateway.md` | Miniforge (Python 3) |
+| `brave-search.md` | Node.js 18+ (npx), Miniforge (mcp-proxy), Brave Search API key |
 
 ---
 
@@ -169,6 +170,43 @@ Verify access:
 
 ---
 
+## 6. Node.js and npx
+
+Required for the Brave Search MCP server, which is installed and run on-demand via `npx`.
+Node.js is pre-installed on the DGX Spark via the system package manager.
+
+```bash
+node --version    # v18.19.1
+npm --version     # 9.2.0
+npx --version     # 9.2.0
+```
+
+If missing:
+
+```bash
+sudo apt-get install -y nodejs npm
+```
+
+---
+
+## 7. mcp-proxy
+
+Required for the Brave Search MCP server. Bridges stdio-based MCP servers to HTTP so that
+Open WebUI (running in Docker) can connect to them.
+
+```bash
+/usr/local/miniforge3/bin/pip install mcp-proxy
+```
+
+Verify:
+
+```bash
+/usr/local/miniforge3/bin/mcp-proxy --version
+# mcp-proxy, version 0.12.0
+```
+
+---
+
 ## Summary Table
 
 | Software | Version (this machine) | Used by | Install method |
@@ -182,5 +220,7 @@ Verify access:
 | CUDA toolkit | 13.0 | llama-server | Pre-installed on DGX Spark |
 | Go | 1.22.2 (min 1.25.4 for llama-swap) | llama-swap | `go.dev/dl` |
 | Docker | 29.2.1 | openwebui | `get.docker.com` |
-| Miniforge / Python 3 | Python 3.13.12 | apex-gateway | Miniforge installer |
+| Miniforge / Python 3 | Python 3.13.12 | apex-gateway, mcp-proxy | Miniforge installer |
 | hf CLI | 1.20.1 | model downloads | Included with Miniforge |
+| Node.js | 18.19.1 | brave-search | `apt-get install nodejs npm` |
+| mcp-proxy | 0.12.0 | brave-search | `pip install mcp-proxy` |

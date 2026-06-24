@@ -191,7 +191,84 @@ Refer to the context window table in `llama-swap.md` for per-model values.
 
 ---
 
-## 7. Upgrading to a New Version
+## 7. MCP Tool Servers
+
+Open WebUI supports MCP (Model Context Protocol) servers as tool backends. Tools allow models
+to search the web, query databases, call APIs, and more during chat sessions.
+
+### Architecture
+
+Open WebUI connects to MCP servers via **Streamable HTTP** (not stdio). Since most MCP servers
+are stdio-based, `mcp-proxy` is used to bridge them to HTTP:
+
+```
+Open WebUI (Docker) → http://<host-ip>:<port>/mcp → mcp-proxy → stdio MCP server
+```
+
+### Connecting an MCP Server
+
+Use the admin API to register an MCP server. The `url` field must contain the **full URL
+including the path** — Open WebUI's MCP client uses the `url` value directly and ignores the
+`path` field when establishing the connection.
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/configs/tool_servers \
+  -H "Authorization: Bearer <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "TOOL_SERVER_CONNECTIONS": [
+      {
+        "url": "http://<host-ip>:<port>/mcp",
+        "path": "/mcp",
+        "type": "mcp",
+        "auth_type": "none",
+        "key": "",
+        "config": {"enable": true},
+        "info": {"id": "<server-id>", "name": "<Display Name>"}
+      }
+    ]
+  }'
+```
+
+To add multiple servers, include all entries in the `TOOL_SERVER_CONNECTIONS` array — the
+API replaces the entire list on each call.
+
+### Verifying a Connection
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/configs/tool_servers/verify \
+  -H "Authorization: Bearer <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "http://<host-ip>:<port>/mcp",
+    "path": "/mcp",
+    "type": "mcp",
+    "auth_type": "none",
+    "key": "",
+    "config": {"enable": true},
+    "info": {"id": "<server-id>", "name": "<Display Name>"}
+  }'
+```
+
+A successful response returns `{"status": true, "specs": [...]}` listing available tools.
+
+### Currently Registered MCP Servers
+
+| Name | Endpoint | Tools | Guide |
+|---|---|---|---|
+| Brave Search | `http://192.168.1.45:8765/mcp` | `brave_web_search`, `brave_local_search` | [`brave-search.md`](brave-search.md) |
+
+### Enabling Tools in a Chat
+
+In the Open WebUI chat interface, click the **+** button or **Tools** (wrench) icon at the
+bottom of the input bar and toggle the desired tool on. The model will call it automatically
+when relevant.
+
+Via the API, pass `"tool_ids": ["server:mcp:<server-id>"]` in the request body.
+
+---
+
+## 8. Upgrading Open WebUI to a New Version
 
 1. Pull the new image:
    ```bash
@@ -217,7 +294,7 @@ Refer to the context window table in `llama-swap.md` for per-model values.
 
 ---
 
-## 8. Service Manager Script
+## 9. Service Manager Script
 
 `/home/sysadmin/codebase/bin/init.openwebui` manages the service:
 
@@ -231,7 +308,7 @@ init.openwebui status
 
 ---
 
-## Key Paths
+## 10. Key Paths
 
 | Path | Purpose |
 |---|---|

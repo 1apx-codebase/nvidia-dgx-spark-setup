@@ -2,7 +2,7 @@
 
 This repository contains scripts, configuration, and documentation for the full AI inference
 stack running on the **NVIDIA DGX Spark (GB10)**. The stack serves LLM inference locally,
-exposes it through a web UI, and integrates with Oracle APEX and live web search.
+exposes it through a web UI, and integrates with Oracle APEX.
 
 ---
 

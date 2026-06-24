@@ -99,22 +99,22 @@ All installation and operational guides are in [`docs/`](docs/).
 
 ## Models
 
-21 models are registered in llama-swap. The default model (`gpt-oss-120b`) loads at service
+20 models are registered in llama-swap. The default model (`gpt-oss-120b`) loads at service
 start and stays resident. All others load on demand and remain loaded until evicted by memory
 pressure.
 
-| Model | Size | Notes |
-|---|---|---|
-| `Qwen2.5-Coder-32B` | 32B Q8_0 | **Default — loads at startup.** 128K ctx, ~34 GB |
-| `gpt-oss-120b` | 120B MXFP4 | Loads on demand. 131K ctx, ~60 GB |
-| `Qwen2.5-Coder-32B` | 32B Q8_0 | Best for programming |
-| `DeepSeek-R1-70B` | 70B Q5_K_M | Strong reasoning and debugging |
-| `Qwen3-32B` | 32B Q8_0 | General purpose, high quality |
-| `Qwen3-Coder-30B` | 30B Q8_0 | Fast code model |
-| `gpt-oss-20b` | 20B Q8_0 | Lightweight fallback, 32K ctx |
-| `Qwen3.5-9B` | 9B Q8_0 | Fastest option |
+| Model | Size | Benchmark | Notes |
+|---|---|---|---|
+| `gpt-oss-120b` | 120B MXFP4 | **55.8 t/s** | **Default — loads at startup.** 131K ctx, ~60 GB |
+| `gpt-oss-20b` | 20B Q8_0 | 80.0 t/s | Lightweight fallback, 32K ctx |
+| `Qwen3-Coder-REAP-25B` | 25B Q4_K_M | 84.7 t/s | Fastest model; reasoning-enhanced coder |
+| `Qwen3-Coder-30B-Q6` | 30B Q6_K | 69.1 t/s | Fast code model, 64K ctx |
+| `Qwen3-Coder-30B` | 30B Q8_0 | 60.1 t/s | Fast code model, full precision |
+| `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.4 t/s | Dedicated code model, 128K ctx |
+| `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 t/s | Strong reasoning and debugging |
+| `Qwen3.5-9B` | 9B Q8_0 | 23.6 t/s | Fast lightweight |
 
-Full model list and context windows: [`docs/llama-swap.md`](docs/llama-swap.md)
+Full model list, benchmark results, and context windows: [`docs/llama-swap.md`](docs/llama-swap.md) · [`docs/benchmark_all_models.md`](docs/benchmark_all_models.md)
 
 ---
 

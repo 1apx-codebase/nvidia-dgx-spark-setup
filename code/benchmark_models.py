@@ -59,7 +59,7 @@ from datetime import datetime
 # ── Configuration ────────────────────────────────────────────────────────────
 
 BASE_URL      = "http://localhost:8080"
-REQUEST_TIMEOUT = 300  # seconds — large models can be slow to respond
+REQUEST_TIMEOUT = 1800  # seconds — allow up to 30 min for large model load + inference
 
 # Short prompt used for generation-speed tests (~30 tokens)
 SHORT_PROMPT = (
@@ -214,7 +214,9 @@ def benchmark_model(model_id: str, iterations: int) -> dict:
     print("    warmup ...", end=" ", flush=True)
     t0 = time.perf_counter()
     try:
-        run_non_stream(model_id, SHORT_PROMPT, max_tokens=20)
+        # Use streaming so sendLoadingState keeps the socket alive while the model loads.
+        # Non-streaming requests get no data until inference completes, causing socket.timeout.
+        _stream_ttft(model_id, SHORT_PROMPT, max_tokens=20)
         results["warmup_s"] = time.perf_counter() - t0
         results["warmup_ok"] = True
         print(f"done ({results['warmup_s']:.1f}s)")

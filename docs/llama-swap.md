@@ -134,7 +134,7 @@ startPort: 10000            # llama-server instances get sequential ports from h
 hooks:
   on_startup:
     preload:
-      - Qwen2.5-Coder-32B   # warm default model at service start
+      - gpt-oss-120b        # warm default model at service start
 
 # ── Macros ───────────────────────────────────────────────────────────────────
 macros:
@@ -153,7 +153,8 @@ macros:
 # ── Models ───────────────────────────────────────────────────────────────────
 models:
 
-  gpt-oss-120b:
+  gpt-oss-120b:               # DEFAULT — loadOnStart; 55.8 t/s (MXFP4 + GB10 optimised)
+    loadOnStart: true          # ~60 GB weights + ~3 GB KV (131K/1 slot) + 32 GB cache ≈ 95 GB
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size 131072 \
          --model ${models_dir}/openai/gpt-oss-120b-MXFP4-GGUF/gpt-oss-120b-mxfp4-00001-of-00003.gguf
     name: "gpt-oss-120B"
@@ -191,8 +192,7 @@ models:
          --model ${models_dir}/unsloth/Qwen3-32B-GGUF/Qwen3-32B-Q8_0.gguf
     name: "Qwen3 32B Q8_0"
 
-  Qwen2.5-Coder-32B:          # DEFAULT — loadOnStart
-    loadOnStart: true           # ~34 GB weights + ~16 GB KV (128K/1 slot) + 32 GB cache-ram = ~82 GB
+  Qwen2.5-Coder-32B:          # dedicated code model; loads on demand
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --model ${models_dir}/bartowski/Qwen2.5-Coder-32B-Instruct-GGUF/Qwen2.5-Coder-32B-Instruct-Q8_0.gguf
     name: "Qwen2.5 Coder 32B Q8_0"
@@ -389,7 +389,7 @@ curl http://localhost:8080/v1/models | python3 -m json.tool
 # Test inference against default model
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"Qwen2.5-Coder-32B","messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"gpt-oss-120b","messages":[{"role":"user","content":"Hello"}]}'
 
 # Tail logs
 tail -f /var/log/llama/llama-swap.log

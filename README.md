@@ -27,6 +27,8 @@ llama-server             ← GPU inference engine (llama.cpp)
 NVIDIA GB10 GPU          ← 121 GiB unified memory, Blackwell (SM 12.1)
 ```
 
+[![Architecture diagram](docs/architecture.svg)](docs/architecture.svg)
+
 ---
 
 ## Services

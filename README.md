@@ -79,7 +79,8 @@ All installation and operational guides are in [`docs/`](docs/).
 | Guide | Description |
 |---|---|
 | [`docs/benchmark-guide.md`](docs/benchmark-guide.md) | How to run the benchmark script — CLI reference, metric definitions, examples, tips specific to this setup. |
-| [`docs/benchmark_gpt-oss-120b.md`](docs/benchmark_gpt-oss-120b.md) | Latest benchmark results for `gpt-oss-120b` (2026-06-23, 3 iterations). Executive summary, key numbers table, per-test detail. |
+| [`docs/benchmark_all_models.md`](docs/benchmark_all_models.md) | Full benchmark of all 20 registered models (2026-06-24, 2 iterations). Results summary, per-model detail, and recommendations. |
+| [`docs/benchmark_gpt-oss-120b.md`](docs/benchmark_gpt-oss-120b.md) | Detailed benchmark for `gpt-oss-120b` only (2026-06-23, 3 iterations). |
 
 ---
 
@@ -104,7 +105,8 @@ pressure.
 
 | Model | Size | Notes |
 |---|---|---|
-| `gpt-oss-120b` | 120B MXFP4 | **Default — loads at startup.** 131K ctx, ~60 GB |
+| `Qwen2.5-Coder-32B` | 32B Q8_0 | **Default — loads at startup.** 128K ctx, ~34 GB |
+| `gpt-oss-120b` | 120B MXFP4 | Loads on demand. 131K ctx, ~60 GB |
 | `Qwen2.5-Coder-32B` | 32B Q8_0 | Best for programming |
 | `DeepSeek-R1-70B` | 70B Q5_K_M | Strong reasoning and debugging |
 | `Qwen3-32B` | 32B Q8_0 | General purpose, high quality |

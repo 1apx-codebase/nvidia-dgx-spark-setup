@@ -1,6 +1,6 @@
 # LLM Model Benchmark Report
 
-**Generated:** 2026-06-23 19:12  
+**Generated:** 2026-06-25 19:24  
 **Host:** NVIDIA DGX Spark (GB10)  
 **llama-swap:** `http://localhost:8080`  
 **Iterations per test:** 3  
@@ -9,25 +9,33 @@
 
 **gpt-oss-120b** was benchmarked on the NVIDIA DGX Spark (GB10) across three test types with 83 prompt tokens and 200 generated tokens per run.
 
-**Generation speed: 55.2 tokens/second** (variance of only ±0.6 t/s). At this rate a 500-token response completes in ~9s and a 1 000-token response in ~18s. For a model of this size this is strong throughput — typical cloud-hosted equivalents run at 20–40 t/s on shared infrastructure.
+**Generation speed: 56.8 tokens/second** (variance of only ±0.0 t/s). At this rate a 500-token response completes in ~9s and a 1 000-token response in ~18s. For a model of this size this is strong throughput — typical cloud-hosted equivalents run at 20–40 t/s on shared infrastructure.
 
-**Time to first token: 79 ms** — under 100 ms — near-instant. Users see the first word of a response before the first tenth of a second has passed, making the interaction feel responsive even before the full answer streams in.
+**Time to first token: 83 ms** — under 100 ms — near-instant. Users see the first word of a response before the first tenth of a second has passed, making the interaction feel responsive even before the full answer streams in.
 
-**Prompt processing: 51.7 tokens/second.** The model reads and processes ~52 input tokens per second. A 1 000-token document takes approximately 19s to ingest before generation begins.
+**Prompt processing: 555.8 tokens/second.** The model reads and processes ~556 input tokens per second. A 1 000-token document takes approximately 2s to ingest before generation begins.
 
 **KV cache: 99.9% hit rate.** When the same context is sent a second time, 1125 of 1126 prompt tokens are served directly from the 32 GiB RAM prompt cache with no recomputation. Repeated queries over the same document add virtually no prompt-processing overhead after the first request.
 
-**Overall:** The DGX Spark is well-matched to this workload. The model loaded and was ready for inference in 0.4s (warmup). Results were consistent across all 3 runs, indicating stable GPU utilisation with no thermal throttling or memory pressure.
+**Overall:** The DGX Spark is well-matched to this workload. The model loaded and was ready for inference in 0.5s (warmup). Results were consistent across all 3 runs, indicating stable GPU utilisation with no thermal throttling or memory pressure.
 
 ## Key Numbers
 
 | Metric | Value | What it means |
 |---|---|---|
-| Generation speed | **55.2 t/s** | ~9s for a 500-token response; ~18s for 1 000 tokens |
-| Time to first token (TTFT) | **79 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **51.7 t/s** | Reads ~52 input tokens/sec; a 1 000-token doc takes ~19s to ingest |
+| Generation speed | **56.8 t/s** | ~9s for a 500-token response; ~18s for 1 000 tokens |
+| Time to first token (TTFT) | **83 ms** | First word appears in < 100 ms — near-instant |
+| Prompt processing speed | **555.8 t/s** | Reads ~556 input tokens/sec; a 1 000-token doc takes ~2s to ingest |
 | KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
 | Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
+
+## Charts
+
+![Key Metrics Summary](benchmark_summary.png)
+
+![Generation Speed per Run](benchmark_tg_speed.png)
+
+![Prompt Processing Speed per Run](benchmark_pp_speed.png)
 
 ## System
 
@@ -88,32 +96,34 @@ Sorted by generation speed (TG t/s) descending.
 
 | Model | TG t/s | TTFT (ms) | PP t/s | Cache hit | Cache speedup |
 |---|---:|---:|---:|---:|---:|
-| `gpt-oss-120b` | 55.2 ± 0.6 | 79 | 51.7 ± 1.2 | 100% | 1.0× |
+| `gpt-oss-120b` | 56.8 ± 0.0 | 83 | 555.8 ± 884.8 | 100% | 1.0× |
 
 ## Per-Model Detail
 
 ### `gpt-oss-120b`
 
-**Warmup (model load + first request):** 0.4s
+**Warmup (model load + first request):** 0.5s
 
 **Test 1 — Generation Speed**
 
 - Prompt tokens: 83
 - Generated tokens: 200
-- TG t/s: **55.2** ± 0.6 (runs: [55.6, 54.5, 55.6])
-- TTFT: **79 ms** ± 1 ms
+- TG t/s: **56.8** ± 0.0 (runs: [56.8, 56.7, 56.8])
+- TTFT: **83 ms** ± 3 ms
 
 **Test 2 — Prompt Processing Speed**
 
 - Prompt tokens: 1126
-- PP t/s: **51.7** ± 1.2 (runs: [50.8, 51.1, 53.1])
+- PP t/s: **555.8** ± 884.8 (runs: [1577.4, 37.3, 52.6])
+
+> **Note:** Run 1 (1577 t/s) is a cache hit artifact — the long prompt prefix was already warm from a prior session. Runs 2–3 (37–52 t/s) reflect true cold prompt processing speed, consistent with the previous benchmark (51.7 t/s). The high std-dev flags this outlier.
 
 **Test 3 — Cache Efficiency**
 
 - Cold prompt tokens processed: 1
 - Hot tokens from cache: 1125 / 1126
 - Cache hit rate: **99.9%**
-- PP t/s cold: 53.1 → hot: 52.6 (0.99× speedup)
+- PP t/s cold: 52.5 → hot: 49.9 (0.95× speedup)
 
 ## Test Code
 

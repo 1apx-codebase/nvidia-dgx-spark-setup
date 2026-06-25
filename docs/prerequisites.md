@@ -10,6 +10,7 @@ Install everything here before following any individual installation guide.
 | `llama-swap.md` | Go, Git, Make, Miniforge/hf CLI (for model downloads) |
 | `openwebui.md` | Docker |
 | `apex-gateway.md` | Miniforge (Python 3) |
+| `benchmark-guide.md` | Miniforge (Python 3), matplotlib (chart generation) |
 
 ---
 
@@ -169,6 +170,27 @@ Verify access:
 
 ---
 
+## 7. matplotlib (benchmark chart generation)
+
+Required by `gen_benchmark_charts.py` to produce PNG charts from benchmark results.
+Installed into the Miniforge Python environment.
+
+```bash
+/usr/local/miniforge3/bin/pip install matplotlib
+```
+
+Verify:
+
+```bash
+/usr/local/miniforge3/bin/python3 -c "import matplotlib; print(matplotlib.__version__)"
+# 3.11.0
+```
+
+> **Note:** `benchmark_models.py` itself uses only Python stdlib and does not require matplotlib.
+> matplotlib is only needed to regenerate the PNG charts via `gen_benchmark_charts.py`.
+
+---
+
 ## Summary Table
 
 | Software | Version (this machine) | Used by | Install method |
@@ -182,5 +204,6 @@ Verify access:
 | CUDA toolkit | 13.0 | llama-server | Pre-installed on DGX Spark |
 | Go | 1.22.2 (min 1.25.4 for llama-swap) | llama-swap | `go.dev/dl` |
 | Docker | 29.2.1 | openwebui | `get.docker.com` |
-| Miniforge / Python 3 | Python 3.13.12 | apex-gateway | Miniforge installer |
+| Miniforge / Python 3 | Python 3.13.12 | apex-gateway, benchmark charts | Miniforge installer |
 | hf CLI | 1.20.1 | model downloads | Included with Miniforge |
+| matplotlib | 3.11.0 | benchmark chart generation | `pip install matplotlib` (in Miniforge) |

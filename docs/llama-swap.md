@@ -119,7 +119,7 @@ sudo tee /etc/default/llama-swap.yaml > /dev/null << 'YAML'
 # Apply changes: sudo systemctl restart llama-swap.service
 
 # ── Global ──────────────────────────────────────────────────────────────────
-healthCheckTimeout: 15000   # ms to wait for llama-server /health
+healthCheckTimeout: 30000   # ms to wait for llama-server /health
 logLevel: info
 logTimeFormat: ""
 logToStdout: "proxy"        # log proxy traffic to stdout
@@ -145,7 +145,7 @@ macros:
   # Standard GB10 flags for all dense / small-MoE models
   args1: --jinja --cont-batching --kv-unified --cache-type-k q8_0 --cache-type-v q8_0 \
          --flash-attn on --batch-size 4096 --ubatch-size 1024 --n-gpu-layers 99 \
-         --no-op-offload --threads 10 --threads-batch 20
+         --no-op-offload --threads 10 --threads-batch 20 --mlock
 
   # Memory management (safe for models ≤120B)
   args2: --no-mmap --cache-ram 32768 --defrag-thold 0.2
@@ -157,8 +157,8 @@ models:
 
   # 120B — quality leader, loads at service start
   gpt-oss-120b:
-    loadOnStart: true          # 55.8 t/s; ~60 GB weights + ~3 GB KV + 32 GB cache ≈ 95 GB
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size 131072 \
+    loadOnStart: true          # 56.8 t/s; ~60 GB weights + ~12 GB KV (4 slots) + 32 GB cache ≈ 104 GB
+    cmd: ${latest-llama} ${args1} ${args2} --ctx-size 131072 --parallel 4 \
          --model ${models_dir}/openai/gpt-oss-120b-MXFP4-GGUF/gpt-oss-120b-mxfp4-00001-of-00003.gguf
     name: "gpt-oss-120B"
     filters:
@@ -213,7 +213,7 @@ across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) f
 
 | Model | Size / Quant | Speed | Role | Why selected |
 |---|---|---|---|---|
-| `gpt-oss-120b` | 120B MXFP4 | **55.8 t/s** | **Default** | Clear quality leader; OpenAI open-source arch, 131K ctx. Fastest high-quality model on this machine. Loads at startup. |
+| `gpt-oss-120b` | 120B MXFP4 | **56.8 t/s** | **Default** | Clear quality leader; OpenAI open-source arch, 131K ctx, 4 parallel slots. Fastest high-quality model on this machine. Loads at startup. |
 | `Qwen3-72B` | 72B Q5_K_M | — | General | Best general-purpose 72B. Qwen3 generation outperforms Qwen2.5 at the same parameter count on MMLU, reasoning, and instruction-following. |
 | `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 t/s | Reasoning | Best reasoning model in the lineup. Chain-of-thought distill of DeepSeek R1 on a Llama-70B base; strong on multi-step reasoning, math, and debugging. |
 | `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.4 t/s | Code | Best dedicated code model. Q8_0 near-lossless precision, 128K native context. Outperforms larger general models on HumanEval and code tasks. |
@@ -231,7 +231,7 @@ across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) f
 | `${latest-llama}` | `llama-server --device CUDA0 --port ${PORT}` |
 | `${models_dir}` | `/home/sysadmin/codebase/models/gguf` |
 | `${default_ctx}` | `128000` |
-| `${args1}` | Standard GB10 inference flags (threads, batching, KV cache, FlashAttn) |
+| `${args1}` | Standard GB10 inference flags (threads, batching, KV cache, FlashAttn, mlock) |
 | `${args2}` | Memory flags: `--no-mmap` (full preload) + `--cache-ram 32768` (32 GiB prompt cache) |
 
 ### args1 Flag Explanations
@@ -250,6 +250,7 @@ across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) f
 | `--no-op-offload` | — | Disable operator offload (not applicable on unified arch) |
 | `--threads` | 10 | 10 Cortex-X925 big cores for decode |
 | `--threads-batch` | 20 | All 20 cores for prompt processing |
+| `--mlock` | — | Pin model weights in RAM; prevents OS paging under memory pressure. Requires `LimitMEMLOCK=infinity` systemd override (see Section 8). |
 
 ### args2 Flag Explanations
 
@@ -258,6 +259,12 @@ across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) f
 | `--no-mmap` | — | Force full model preload into unified memory; avoids page faults during inference |
 | `--cache-ram` | 32768 | 32 GiB RAM prompt prefix cache (llama.cpp PR #16391) |
 | `--defrag-thold` | 0.2 | Defragment KV cache when fragmentation exceeds 20% |
+
+### Per-Model Overrides
+
+| Model | Flag | Value | Reason |
+|---|---|---|---|
+| `gpt-oss-120b` | `--parallel` | 4 | 4 concurrent decode slots; ~12 GB KV across all slots; fits within 121 GiB budget |
 
 ### Context Window by Model
 
@@ -292,8 +299,24 @@ After downloading, add the model entry to `/etc/default/llama-swap.yaml` and res
 
 ## 8. Systemd Unit — `/etc/systemd/system/llama-swap.service`
 
+> **mlock drop-in required:** `--mlock` is set in `args1`, but systemd's default `LimitMEMLOCK` is 8 MB.
+> Create the drop-in below **before** starting the service, or mlocking will silently fail with a warning.
+
+### 8a. mlock Drop-in — `/etc/systemd/system/llama-swap.service.d/mlock.conf`
+
+```bash
+sudo mkdir -p /etc/systemd/system/llama-swap.service.d
+sudo tee /etc/systemd/system/llama-swap.service.d/mlock.conf > /dev/null << 'EOF'
+[Service]
+LimitMEMLOCK=infinity
+EOF
+```
+
+### 8b. Systemd Unit
+
 ```bash
 sudo tee /etc/systemd/system/llama-swap.service > /dev/null << 'EOF'
+# Note: also create the mlock drop-in above before enabling
 [Unit]
 Description=LLAMA-SWAP Server
 After=network-online.target docker.service openwebui.service
@@ -332,6 +355,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable llama-swap.service
 sudo systemctl start llama-swap.service
 sudo systemctl status llama-swap.service
+
+# Verify mlock limit took effect
+sudo systemctl show llama-swap.service | grep LimitMEMLOCK
+# Expected: LimitMEMLOCK=infinity
 ```
 
 ---
@@ -379,5 +406,6 @@ init.llama-swap status
 | `/etc/default/llama-swap.yaml` | Main configuration |
 | `/etc/default/llama-swap.profile` | Environment variables for the service |
 | `/etc/systemd/system/llama-swap.service` | Systemd unit |
+| `/etc/systemd/system/llama-swap.service.d/mlock.conf` | Drop-in: sets `LimitMEMLOCK=infinity` (required for `--mlock`) |
 | `/var/log/llama/llama-swap.log` | Log file |
 | `~/codebase/models/gguf/` | Model root (model-shelf layout) |

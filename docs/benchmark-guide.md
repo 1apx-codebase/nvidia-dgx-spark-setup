@@ -6,9 +6,10 @@ produces a dated markdown report. It uses the server's own timing data — no es
 covers generation speed, prompt processing speed, time to first token, and KV-cache efficiency.
 
 - **Script:** `/home/sysadmin/codebase/bin/benchmark_models.py`
-- **Output:** markdown report (default: `benchmark_<YYYYMMDD_HHMM>.md`)
+- **Chart script:** `/home/sysadmin/codebase/bin/gen_benchmark_charts.py`
+- **Output:** markdown report (default: `benchmark_<YYYYMMDD_HHMM>.md`) + PNG charts in `docs/`
 - **Requires:** llama-swap running on `http://localhost:8080`
-- **Runtime:** Python 3 (stdlib only — no pip installs needed)
+- **Runtime:** Python 3 stdlib only (benchmark); matplotlib required for chart generation (see `prerequisites.md`)
 
 ---
 
@@ -174,9 +175,10 @@ prompt-processing figures (PP t/s accounts for reasoning tokens).
 3 runs is sufficient for stable results on loaded models. Use 5–10 if you want tighter
 standard deviations or are comparing models that differ by less than 10%.
 
-**The script uses only Python stdlib.**
-No virtual environment or pip install is needed. Run it directly with any Python 3.8+
-interpreter, including `/usr/local/miniforge3/bin/python3`.
+**`benchmark_models.py` uses only Python stdlib.**
+No virtual environment or pip install is needed for the benchmark itself. Run it directly
+with any Python 3.8+ interpreter, including `/usr/local/miniforge3/bin/python3`.
+Chart generation (`gen_benchmark_charts.py`) requires matplotlib — see `prerequisites.md`.
 
 ---
 
@@ -196,7 +198,32 @@ Existing results are in:
 
 | File | Contents |
 |---|---|
-| `docs/benchmark_gpt-oss-120b.md` | Latest gpt-oss-120b benchmark (3 iterations, 2026-06-23) |
+| `docs/benchmark_gpt-oss-120b.md` | Latest gpt-oss-120b benchmark (3 iterations, 2026-06-25) |
+| `docs/benchmark_tg_speed.png` | Generation speed per run chart |
+| `docs/benchmark_pp_speed.png` | Prompt processing speed per run chart |
+| `docs/benchmark_summary.png` | Key metrics summary chart |
+
+---
+
+## Chart Generation
+
+After running a benchmark, regenerate the PNG charts with:
+
+```bash
+python3 /home/sysadmin/codebase/bin/gen_benchmark_charts.py
+```
+
+This reads the hardcoded results from the latest `gpt-oss-120b` benchmark run and writes
+three PNGs directly to `docs/`:
+
+| File | Chart |
+|---|---|
+| `docs/benchmark_summary.png` | Horizontal bar overview — all key metrics vs reference maximums |
+| `docs/benchmark_tg_speed.png` | Generation speed per run — shows run-to-run consistency |
+| `docs/benchmark_pp_speed.png` | Prompt processing per run — log scale; cache-warm outliers annotated |
+
+> **Note:** Update the data constants at the top of `gen_benchmark_charts.py` after each new
+> benchmark run (`TG_RUNS`, `TTFT_RUNS`, `PP_RUNS`, etc.).
 
 ---
 
@@ -204,7 +231,8 @@ Existing results are in:
 
 | Path | Purpose |
 |---|---|
-| `/home/sysadmin/codebase/bin/benchmark_models.py` | Benchmark script |
+| `/home/sysadmin/codebase/bin/benchmark_models.py` | Benchmark script (stdlib only) |
+| `/home/sysadmin/codebase/bin/gen_benchmark_charts.py` | Chart generation script (requires matplotlib) |
 | `/home/sysadmin/codebase/bin/docs/` | Report output directory |
 | `http://localhost:8080` | llama-swap endpoint (must be running) |
 | `/etc/default/llama-swap.yaml` | Model registry (source of model IDs) |

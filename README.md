@@ -72,7 +72,7 @@ All installation and operational guides are in [`docs/`](docs/).
 |---|---|
 | [`docs/prerequisites.md`](docs/prerequisites.md) | All required software — install this first. Covers apt packages, CUDA, Go, Docker, Miniforge, and Hugging Face auth. |
 | [`docs/llama-server.md`](docs/llama-server.md) | Build llama.cpp from source with optimised CMake flags for the GB10 (ARM KleidiAI, CUDA FA, LTO), install the binary, configure the standalone systemd service. |
-| [`docs/llama-swap.md`](docs/llama-swap.md) | Install and configure llama-swap — full annotated config YAML, all 21 registered models, arg macro reference, model download instructions, systemd unit. |
+| [`docs/llama-swap.md`](docs/llama-swap.md) | Install and configure llama-swap — full annotated config YAML, 7 registered models, arg macro reference, model download instructions, systemd unit. |
 | [`docs/openwebui.md`](docs/openwebui.md) | Deploy Open WebUI in Docker, connect to llama-swap, set context windows per model, register MCP tool servers, upgrade procedure. |
 | [`docs/apex-gateway.md`](docs/apex-gateway.md) | Deploy the APEX Gateway proxy — full Python source, systemd unit, Oracle APEX configuration, request flow diagram. |
 
@@ -101,22 +101,21 @@ All installation and operational guides are in [`docs/`](docs/).
 
 ## Models
 
-20 models are registered in llama-swap. The default model (`gpt-oss-120b`) loads at service
-start and stays resident. All others load on demand and remain loaded until evicted by memory
-pressure.
+7 models are registered in llama-swap, selected from the full benchmark run (2026-06-24) as the
+highest-value set across quality tiers. The default model (`gpt-oss-120b`) loads at service start
+and stays resident. All others load on demand.
 
-| Model | Size | Benchmark | Notes |
+| Model | Size | Speed | Why kept |
 |---|---|---|---|
-| `gpt-oss-120b` | 120B MXFP4 | **55.8 t/s** | **Default — loads at startup.** 131K ctx, ~60 GB |
-| `gpt-oss-20b` | 20B Q8_0 | 80.0 t/s | Lightweight fallback, 32K ctx |
-| `Qwen3-Coder-REAP-25B` | 25B Q4_K_M | 84.7 t/s | Fastest model; reasoning-enhanced coder |
-| `Qwen3-Coder-30B-Q6` | 30B Q6_K | 69.1 t/s | Fast code model, 64K ctx |
-| `Qwen3-Coder-30B` | 30B Q8_0 | 60.1 t/s | Fast code model, full precision |
-| `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.4 t/s | Dedicated code model, 128K ctx |
-| `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 t/s | Strong reasoning and debugging |
-| `Qwen3.5-9B` | 9B Q8_0 | 23.6 t/s | Fast lightweight |
+| `gpt-oss-120b` | 120B MXFP4 | **55.8 t/s** | **Default — loads at startup.** Clear quality leader; OpenAI open-source arch, 131K ctx, ~60 GB. Fastest high-quality model on this machine. |
+| `Qwen3-72B` | 72B Q5_K_M | — | Best general-purpose 72B. Qwen3 generation outperforms Qwen2.5 at the same parameter count across MMLU, reasoning, and instruction-following benchmarks. |
+| `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 t/s | Best reasoning model in the lineup. Chain-of-thought distill of DeepSeek R1 on a Llama-70B base — strong on multi-step reasoning, math, and debugging. |
+| `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.4 t/s | Best dedicated code model. Q8_0 near-lossless precision, 128K native context. Purpose-trained on code and outperforms larger general models on HumanEval/code tasks. |
+| `Nemotron-Nano-Omni-30B` | 30B Q8_0 | — | Only model with image input support (`--mmproj`). Vision + reasoning in one; kept for multimodal tasks. |
+| `Codestral-22B` | 22B Q8_0 | — | Mistral-trained SQL and code specialist. Strongest model for structured queries; complements the general coder. |
+| `Qwen3.5-9B` | 9B Q8_0 | 23.6 t/s | Fast lightweight tier. Full Q8_0 precision at 9B; best choice for quick tasks, latency-sensitive requests, or when the 70B+ models are busy. |
 
-Full model list, benchmark results, and context windows: [`docs/llama-swap.md`](docs/llama-swap.md) · [`docs/benchmark_all_models.md`](docs/benchmark_all_models.md)
+Benchmark results and full model history: [`docs/benchmark_all_models.md`](docs/benchmark_all_models.md) · [`docs/llama-swap.md`](docs/llama-swap.md)
 
 ---
 

@@ -151,10 +151,13 @@ macros:
   args2: --no-mmap --cache-ram 32768 --defrag-thold 0.2
 
 # ── Models ───────────────────────────────────────────────────────────────────
+# 5 models selected from full benchmark run (2026-06-24) as highest-value set
+# across quality tiers. See docs/benchmark_all_models.md for full results.
 models:
 
-  gpt-oss-120b:               # DEFAULT — loadOnStart; 55.8 t/s (MXFP4 + GB10 optimised)
-    loadOnStart: true          # ~60 GB weights + ~3 GB KV (131K/1 slot) + 32 GB cache ≈ 95 GB
+  # 120B — quality leader, loads at service start
+  gpt-oss-120b:
+    loadOnStart: true          # 55.8 t/s; ~60 GB weights + ~3 GB KV + 32 GB cache ≈ 95 GB
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size 131072 \
          --model ${models_dir}/openai/gpt-oss-120b-MXFP4-GGUF/gpt-oss-120b-mxfp4-00001-of-00003.gguf
     name: "gpt-oss-120B"
@@ -162,107 +165,65 @@ models:
       setParams:
         reasoning_effort: high
 
+  # 72B — best general-purpose model; Qwen3 gen outperforms Qwen2.5 at same size
   Qwen3-72B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --model ${models_dir}/mradermacher/Qwen3-72B-Instruct-GGUF/Qwen3-72B-Instruct.Q5_K_M.gguf
     name: "Qwen3 72B Instruct Q5_K_M"
 
-  Qwen2.5-72B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/bartowski/Qwen2.5-72B-Instruct-GGUF/Qwen2.5-72B-Instruct-Q5_K_M/Qwen2.5-72B-Instruct-Q5_K_M-00001-of-00002.gguf
-    name: "Qwen2.5 72B Instruct Q5_K_M"
-
-  Qwen2.5-72B-Q4:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/lmstudio-community/Qwen2.5-72B-Instruct-GGUF/Qwen2.5-72B-Instruct-Q4_K_M.gguf
-    name: "Qwen2.5 72B Instruct Q4_K_M"
-
-  Llama-3.3-70B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/Llama-3.3-70B-Instruct-GGUF/Llama-3.3-70B-Instruct-Q5_K_M.gguf
-    name: "Llama 3.3 70B Instruct"
-
+  # 70B — best reasoning model; DeepSeek R1 CoT distill on Llama-70B base
   DeepSeek-R1-70B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --model ${models_dir}/unsloth/DeepSeek-R1-Distill-Llama-70B-GGUF/DeepSeek-R1-Distill-Llama-70B-Q5_K_M.gguf
     name: "DeepSeek R1 Distill 70B"
 
-  Qwen3-32B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/Qwen3-32B-GGUF/Qwen3-32B-Q8_0.gguf
-    name: "Qwen3 32B Q8_0"
-
-  Qwen2.5-Coder-32B:          # dedicated code model; loads on demand
+  # 32B — best dedicated code model; Q8_0 near-lossless, 128K native ctx
+  Qwen2.5-Coder-32B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --model ${models_dir}/bartowski/Qwen2.5-Coder-32B-Instruct-GGUF/Qwen2.5-Coder-32B-Instruct-Q8_0.gguf
     name: "Qwen2.5 Coder 32B Q8_0"
 
-  Qwen3-Coder-30B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q8_0.gguf
-    name: "Qwen3 Coder 30B A3B Q8_0"
-
-  Qwen3-Coder-30B-Q6:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size 65536 \
-         --model ${models_dir}/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/Qwen3-Coder-30B-A3B-Instruct-Q6_K.gguf
-    name: "Qwen3 Coder 30B A3B Q6_K 64K"
-
-  Nemotron-Nano-30B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/nvidia/Nemotron-3-Nano-30B-A3B-UD-GGUF/Nemotron-3-Nano-30B-A3B-UD-Q8_K_XL.gguf
-    name: "Nemotron 3 Nano 30B A3B UD Q8_K_XL"
-
-  Nemotron-Nano-30B-Q4:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/Nemotron-3-Nano-30B-A3B-GGUF/Nemotron-3-Nano-30B-A3B-Q4_K_M.gguf
-    name: "Nemotron 3 Nano 30B A3B Q4_K_M"
-
+  # 30B — vision + reasoning; only model with image input support (--mmproj)
   Nemotron-Nano-Omni-30B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --mmproj ${models_dir}/lmstudio-community/nemotron-3-nano-omni-30b-a3b-reasoning-gguf/mmproj-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16.gguf \
          --model ${models_dir}/unsloth/NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-GGUF/NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-Q8_0.gguf
     name: "Nemotron 3 Nano Omni 30B A3B Reasoning Q8_0"
 
-  Qwen3-Coder-REAP-25B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/alibaba/Qwen3-Coder-REAP-25B-GGUF/qwen3-coder-reap-25b-a3b-q4_k_m.gguf
-    name: "Qwen3 Coder REAP 25B"
-
-  Gemma-3-27B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/gemma-3-27b-it-GGUF/gemma-3-27b-it-Q8_0.gguf
-    name: "Gemma 3 27B IT Q8_0"
-
-  Mistral-Small-3.1-24B:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/Mistral-Small-3.1-24B-Instruct-2503-GGUF/Mistral-Small-3.1-24B-Instruct-2503-Q8_0.gguf
-    name: "Mistral Small 3.1 24B"
-
+  # 22B — SQL/code specialist; Mistral-trained, strongest for structured queries
   Codestral-22B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --model ${models_dir}/lmstudio-community/Codestral-22B-v0.1-GGUF/Codestral-22B-v0.1-Q8_0.gguf
     name: "Codestral 22B Q8_0"
 
-  gpt-oss-20b:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size 32768 \
-         --model ${models_dir}/unsloth/gpt-oss-20b-GGUF/gpt-oss-20b-Q8_0.gguf
-    name: "gpt-oss-20B Q8_0"
-
+  # 9B — fast lightweight tier; Q8_0 full precision for quick/latency-sensitive tasks
   Qwen3.5-9B:
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
          --model ${models_dir}/unsloth/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q8_0.gguf
     name: "Qwen3.5 9B Q8_0"
-
-  Qwen3.5-9B-Q4:
-    cmd: ${latest-llama} ${args1} ${args2} --ctx-size ${default_ctx} \
-         --model ${models_dir}/unsloth/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf
-    name: "Qwen3.5 9B Q4_K_M"
 YAML
 ```
 
 ---
 
-## 6. Macro Reference
+## 6. Registered Models
+
+7 models are active, selected from a full benchmark run on 2026-06-24 as the highest-value set
+across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) for raw results.
+
+| Model | Size / Quant | Speed | Role | Why selected |
+|---|---|---|---|---|
+| `gpt-oss-120b` | 120B MXFP4 | **55.8 t/s** | **Default** | Clear quality leader; OpenAI open-source arch, 131K ctx. Fastest high-quality model on this machine. Loads at startup. |
+| `Qwen3-72B` | 72B Q5_K_M | — | General | Best general-purpose 72B. Qwen3 generation outperforms Qwen2.5 at the same parameter count on MMLU, reasoning, and instruction-following. |
+| `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 t/s | Reasoning | Best reasoning model in the lineup. Chain-of-thought distill of DeepSeek R1 on a Llama-70B base; strong on multi-step reasoning, math, and debugging. |
+| `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.4 t/s | Code | Best dedicated code model. Q8_0 near-lossless precision, 128K native context. Outperforms larger general models on HumanEval and code tasks. |
+| `Nemotron-Nano-Omni-30B` | 30B Q8_0 | — | Vision | Only model with image input support (`--mmproj`). Vision + reasoning in one; use for multimodal tasks. |
+| `Codestral-22B` | 22B Q8_0 | — | SQL/Code | Mistral-trained SQL and code specialist. Strongest model for structured queries and database work alongside the general coder. |
+| `Qwen3.5-9B` | 9B Q8_0 | 23.6 t/s | Lightweight | Fast lightweight tier. Full Q8_0 precision; best choice for quick tasks, latency-sensitive requests, or when 70B+ models are busy. |
+
+---
+
+## 7. Macro Reference
 
 | Macro | Expands To / Purpose |
 |---|---|
@@ -303,8 +264,6 @@ YAML
 | Model | `--ctx-size` | Reason |
 |---|---|---|
 | `gpt-oss-120b` | 131072 | Model native maximum |
-| `gpt-oss-20b` | 32768 | Model native maximum |
-| `Qwen3-Coder-30B-Q6` | 65536 | Model trained to 64K only |
 | All others | 128000 (`${default_ctx}`) | 128K default; fits comfortably |
 
 ---

@@ -240,14 +240,70 @@ python3 benchmark_models.py \
 
 ---
 
-## Model Selection Guide
+## Recommendations
 
-| Use case | Best choice | Reason |
+### Key Findings
+
+**`gpt-oss-120b` defies its size.** At 120B parameters it matches a 30B model in generation speed (56 t/s) — a direct result of MXFP4 compression halving memory bandwidth pressure. It is simultaneously the highest-quality and second-fastest model tested. For this machine it is the unambiguous default.
+
+**`Nemotron-Nano-Omni-30B` is surprisingly fast.** Its 57.3 t/s edges out gpt-oss-120b for generation speed. MoE architecture means only a fraction of parameters are active per token, giving it near-9B speed at 30B quality. However, its KV cache hit rate is 59% vs 99.9% for dense models — in chat sessions with long shared context, gpt-oss-120b will process repeated context faster.
+
+**70B+ dense models are bandwidth-bottlenecked.** `Qwen3-72B` (3.8 t/s) and `DeepSeek-R1-70B` (4.0 t/s) are 14× slower than gpt-oss-120b. At 4 t/s a 500-token response takes ~2 minutes. These are not viable for interactive use; they suit offline batch processing or tasks where quality outweighs wait time.
+
+**`Qwen3.5-9B` has the lowest TTFT.** At 73 ms it is the most responsive model for short exchanges, and at 16s load time it is the fastest to cold-start. Best choice when a model is not pre-loaded.
+
+---
+
+### Model Selection Guide
+
+| Use case | Recommendation | Notes |
 |---|---|---|
-| Interactive chat / coding | `gpt-oss-120b` | 56 t/s, 82 ms TTFT, 128K ctx, near-perfect cache |
-| Fast lightweight tasks | `Qwen3.5-9B` | 24 t/s, 73 ms TTFT, loads in 16s |
-| Vision + reasoning | `Nemotron-Nano-Omni-30B` | 57 t/s, supports mmproj image input |
-| SQL / code specialist | `Codestral-22B` | Faster than Qwen2.5-Coder at lower quality |
-| Deep reasoning / CoT | `DeepSeek-R1-70B` | Chain-of-thought distill; accepts lower speed |
-| Best code quality | `Qwen2.5-Coder-32B` | Q8_0 near-lossless, 128K ctx |
-| Largest dense quality | `Qwen3-72B` | Highest parameter count; slowest |
+| **Default — interactive chat, APEX, Open WebUI** | `gpt-oss-120b` | Pre-loaded at startup; 56 t/s; 82 ms TTFT; 128K ctx; 4 parallel slots handle concurrent users |
+| **Multi-user / concurrent requests** | `gpt-oss-120b` | `--parallel 4` provides 4 independent decode slots at full 56 t/s each; up to 4 users served simultaneously without queuing |
+| **Vision / multimodal tasks** | `Nemotron-Nano-Omni-30B` | Only model with `--mmproj` image support; matches gpt-oss-120b in speed; load on demand (~36s) |
+| **Low-latency / simple queries** | `Qwen3.5-9B` | Fastest TTFT (73 ms); loads in 16s; 24 t/s; use when gpt-oss-120b is busy or for lightweight automation |
+| **SQL / structured queries** | `Codestral-22B` | Mistral-trained SQL specialist; 9.5 t/s; fastest code-oriented model |
+| **Code generation — quality-first** | `Qwen2.5-Coder-32B` | Q8_0 near-lossless; purpose-trained on code; 128K ctx; 6.5 t/s — accept the speed cost for complex tasks |
+| **Deep reasoning, math, debugging** | `DeepSeek-R1-70B` | Chain-of-thought distill; produces visible reasoning trace; 4 t/s — plan for long waits on complex prompts |
+| **Largest general-purpose quality** | `Qwen3-72B` | 3.8 t/s; slowest model tested; use only when parameter count matters more than response time |
+
+---
+
+### What Not to Use for Interactive Work
+
+`Qwen3-72B` and `DeepSeek-R1-70B` generate at 3–4 t/s. A conversational exchange requiring a 300-token reply takes 75–80 seconds of generation alone. Both models are better suited to batch jobs, overnight runs, or one-shot tasks where the user can walk away and return.
+
+---
+
+### Memory and Co-Loading Constraints
+
+This machine has 121 GiB unified memory.
+
+| Scenario | Feasible? | Notes |
+|---|---|---|
+| `gpt-oss-120b` alone | ✓ | ~104 GB total (weights + KV + cache); 17 GB headroom |
+| `gpt-oss-120b` + any other model | ✗ | No room — even `Qwen3.5-9B` (~9 GB) would exceed budget |
+| Any single 70B model | ✓ | ~48–50 GB; leaves 70+ GB free |
+| Two 30B models simultaneously | ✓ | ~60 GB total; fits comfortably |
+| `Nemotron-Nano-Omni-30B` + `Qwen3.5-9B` | ✓ | ~39 GB total; viable for multi-model serving |
+
+With `globalTTL: 0` (current config), each model stays resident once loaded. Only one model can be in memory at a time when `gpt-oss-120b` is the active model — llama-swap handles unloading automatically when another model is requested.
+
+---
+
+### Speed vs Quality Trade-off Summary
+
+```
+Speed (t/s)
+   60 ┤ ●Nemotron-Omni-30B (57.3)   ●gpt-oss-120b (56.2)
+      │
+   25 ┤                              ●Qwen3.5-9B (24.2)
+      │
+   10 ┤ ●Codestral-22B (9.5)
+    7 ┤                              ●Qwen2.5-Coder-32B (6.5)
+    4 ┤ ●DeepSeek-R1-70B (4.0)      ●Qwen3-72B (3.8)
+      └──────────────────────────────────────────
+         ← Specialist              General-purpose →
+```
+
+For this hardware, `gpt-oss-120b` sits in the rare position of being both the fastest and highest-quality general model. The only reason to choose another model is a specific capability it lacks: vision input (Nemotron), SQL specialisation (Codestral), explicit reasoning traces (DeepSeek-R1), or a need to offload from gpt-oss-120b when it is saturated (Qwen3.5-9B).

@@ -11,6 +11,7 @@ Install everything here before following any individual installation guide.
 | `openwebui.md` | Docker |
 | `apex-gateway.md` | Miniforge (Python 3) |
 | `Firecrawl.md` | Docker (Compose plugin), Python 3 (system — for llama-responses-proxy) |
+| `lmstudio.md` | LM Studio app + `lms` CLI (installed from lmstudio.ai — not via apt) |
 | `benchmark-guide.md` | Miniforge (Python 3), matplotlib (chart generation) |
 
 ---
@@ -189,6 +190,32 @@ Verify:
 
 > **Note:** `benchmark_models.py` itself uses only Python stdlib and does not require matplotlib.
 > matplotlib is only needed to regenerate the PNG charts via `gen_benchmark_charts.py`.
+
+---
+
+## 8. CUDA Verification Utility
+
+`cuda.ok.py` is a one-shot script to confirm PyTorch can see the GPU. Optional — only needed if you install PyTorch for ML work separate from the main inference stack.
+
+```bash
+tee /home/sysadmin/codebase/bin/cuda.ok.py > /dev/null << 'EOF'
+import torch
+print("PyTorch version:", torch.__version__)
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))
+else:
+    print("No CUDA GPU detected")
+EOF
+chmod 755 /home/sysadmin/codebase/bin/cuda.ok.py
+```
+
+Run it:
+
+```bash
+python3 /home/sysadmin/codebase/bin/cuda.ok.py
+# PyTorch version: 2.x.x
+# GPU: NVIDIA GB10
+```
 
 ---
 

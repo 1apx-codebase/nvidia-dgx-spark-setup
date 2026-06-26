@@ -166,6 +166,151 @@ sudo systemctl status llama-responses-proxy.service
 sudo systemctl restart llama-responses-proxy.service
 ```
 
+### init.firecrawl script source
+
+```bash
+sudo tee /home/sysadmin/codebase/bin/init.firecrawl > /dev/null << 'EOF'
+#!/usr/bin/env bash
+# =============================================================================
+# init.firecrawl — Firecrawl Service Manager
+# Manages the Firecrawl Docker Compose stack and its llama-responses-proxy
+# dependency (Responses API → Chat Completions translation layer).
+# =============================================================================
+set -euo pipefail
+
+COMPOSE_DIR="/home/sysadmin/codebase/firecrawl"
+PROXY_SERVICE="llama-responses-proxy.service"
+API_CONTAINER="firecrawl-api-1"
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
+
+info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
+success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
+die()     { error "$*"; exit 1; }
+separator() { echo -e "${CYAN}$(printf '─%.0s' {1..60})${RESET}"; }
+require_systemctl() { command -v systemctl &>/dev/null || die "systemctl not found."; }
+require_docker()    { command -v docker &>/dev/null || die "docker not found."; }
+
+usage() {
+    echo -e ""
+    echo -e "${BOLD}init.firecrawl${RESET} — Firecrawl Service Manager"
+    echo -e ""
+    echo -e "${BOLD}USAGE${RESET}"
+    echo -e "  init.firecrawl <command>"
+    echo -e ""
+    echo -e "${BOLD}COMMANDS${RESET}"
+    echo -e "  start         Start proxy then bring up Firecrawl stack"
+    echo -e "  stop          Bring down Firecrawl stack then stop proxy"
+    echo -e "  restart       Restart both (stop then start)"
+    echo -e "  status        Show proxy and container status"
+    echo -e "  logs          Tail Firecrawl API logs  (Ctrl-C to exit)"
+    echo -e "  logs proxy    Tail llama-responses-proxy logs  (Ctrl-C to exit)"
+    echo -e "  help          Show this help message"
+    echo -e ""
+    echo -e "${BOLD}FILES${RESET}"
+    echo -e "  Compose dir:  ${COMPOSE_DIR}"
+    echo -e "  Config:       ${COMPOSE_DIR}/.env"
+    echo -e "  Proxy:        /home/sysadmin/codebase/bin/llama-responses-proxy.py"
+    echo -e ""
+    echo -e "${BOLD}API${RESET}"
+    echo -e "  http://localhost:3002"
+    echo -e ""
+}
+
+cmd_start() {
+    info "Starting ${PROXY_SERVICE}…"
+    sudo systemctl start "$PROXY_SERVICE" \
+        && success "Proxy started." \
+        || die "Failed to start ${PROXY_SERVICE}."
+    separator
+    info "Bringing up Firecrawl stack…"
+    docker compose -f "${COMPOSE_DIR}/docker-compose.yaml" \
+        --env-file "${COMPOSE_DIR}/.env" up -d \
+        2>&1 | grep -v "^time=.*level=warning" || die "docker compose up failed."
+    success "Firecrawl stack up."
+    separator
+    cmd_status
+}
+
+cmd_stop() {
+    info "Bringing down Firecrawl stack…"
+    docker compose -f "${COMPOSE_DIR}/docker-compose.yaml" \
+        --env-file "${COMPOSE_DIR}/.env" down \
+        2>&1 | grep -v "^time=.*level=warning" || warn "docker compose down had errors."
+    success "Firecrawl stack down."
+    separator
+    info "Stopping ${PROXY_SERVICE}…"
+    sudo systemctl stop "$PROXY_SERVICE" \
+        && success "Proxy stopped." \
+        || warn "Failed to stop ${PROXY_SERVICE} (may already be stopped)."
+}
+
+cmd_restart() { cmd_stop; separator; cmd_start; }
+
+cmd_status() {
+    info "Proxy — ${PROXY_SERVICE}:"
+    separator
+    sudo systemctl status "$PROXY_SERVICE" --no-pager -l || true
+    separator
+    info "Firecrawl containers:"
+    docker compose -f "${COMPOSE_DIR}/docker-compose.yaml" \
+        --env-file "${COMPOSE_DIR}/.env" ps \
+        2>&1 | grep -v "^time=.*level=warning" || true
+    separator
+    info "API health check:"
+    if curl -sf http://localhost:3002/v1/scrape \
+            -H "Content-Type: application/json" \
+            -d '{"url":"https://example.com","formats":["markdown"]}' \
+            -o /dev/null --max-time 10 2>/dev/null; then
+        success "API is responding on :3002"
+    else
+        warn "API not responding (may still be starting)"
+    fi
+    separator
+}
+
+cmd_logs() {
+    local target="${1:-api}"
+    case "$target" in
+        proxy)
+            info "Tailing ${PROXY_SERVICE} logs  (Ctrl-C to exit)"
+            separator
+            sudo journalctl -u "$PROXY_SERVICE" -f --no-pager
+            ;;
+        api|*)
+            info "Tailing ${API_CONTAINER} logs  (Ctrl-C to exit)"
+            separator
+            docker logs -f "$API_CONTAINER" 2>&1 | grep -v "^time=.*level=warning"
+            ;;
+    esac
+}
+
+main() {
+    require_systemctl
+    require_docker
+    local command="${1:-help}"
+    shift || true
+    case "$command" in
+        start)           cmd_start         ;;
+        stop)            cmd_stop          ;;
+        restart)         cmd_restart       ;;
+        status)          cmd_status        ;;
+        logs)            cmd_logs "${1:-}" ;;
+        help|--help|-h)  usage             ;;
+        *)
+            error "Unknown command: '$command'"
+            usage; exit 1
+            ;;
+    esac
+}
+main "$@"
+EOF
+sudo chmod 755 /home/sysadmin/codebase/bin/init.firecrawl
+```
+
 ---
 
 ## Configuration
@@ -203,11 +348,212 @@ Six containers, all using pre-built `ghcr.io/firecrawl/` images (no local build)
 
 The `build:` directives in `docker-compose.yaml` are commented out and replaced with `image:` for all three Firecrawl-specific services.
 
+### docker-compose.yaml
+
+Full file as deployed at `/home/sysadmin/codebase/firecrawl/docker-compose.yaml` (after applying the `image:` swap from §2 of Fresh Install):
+
+```yaml
+name: firecrawl
+
+x-common-service: &common-service
+  image: ghcr.io/firecrawl/firecrawl
+  # build: apps/api   ← commented out; use pre-built image
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  networks:
+    - backend
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+      compress: "true"
+
+x-common-env: &common-env
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  REDIS_RATE_LIMIT_URL: ${REDIS_URL:-redis://redis:6379}
+  PLAYWRIGHT_MICROSERVICE_URL: ${PLAYWRIGHT_MICROSERVICE_URL:-http://playwright-service:3000/scrape}
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+  POSTGRES_DB: ${POSTGRES_DB:-postgres}
+  POSTGRES_HOST: ${POSTGRES_HOST:-nuq-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  USE_DB_AUTHENTICATION: ${USE_DB_AUTHENTICATION:-false}
+  NUM_WORKERS_PER_QUEUE: ${NUM_WORKERS_PER_QUEUE:-8}
+  CRAWL_CONCURRENT_REQUESTS: ${CRAWL_CONCURRENT_REQUESTS:-10}
+  MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-5}
+  BROWSER_POOL_SIZE: ${BROWSER_POOL_SIZE:-5}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+  MODEL_NAME: ${MODEL_NAME}
+  MODEL_EMBEDDING_NAME: ${MODEL_EMBEDDING_NAME}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+  AUTUMN_SECRET_KEY: ${AUTUMN_SECRET_KEY}
+  SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+  BULL_AUTH_KEY: ${BULL_AUTH_KEY}
+  TEST_API_KEY: ${TEST_API_KEY}
+  SUPABASE_ANON_TOKEN: ${SUPABASE_ANON_TOKEN}
+  SUPABASE_URL: ${SUPABASE_URL}
+  SUPABASE_SERVICE_TOKEN: ${SUPABASE_SERVICE_TOKEN}
+  SELF_HOSTED_WEBHOOK_URL: ${SELF_HOSTED_WEBHOOK_URL}
+  LOGGING_LEVEL: ${LOGGING_LEVEL}
+  PROXY_SERVER: ${PROXY_SERVER}
+  PROXY_USERNAME: ${PROXY_USERNAME}
+  PROXY_PASSWORD: ${PROXY_PASSWORD}
+  SEARXNG_ENDPOINT: ${SEARXNG_ENDPOINT}
+  SEARXNG_ENGINES: ${SEARXNG_ENGINES}
+  SEARXNG_CATEGORIES: ${SEARXNG_CATEGORIES}
+  NUQ_BACKEND: ${NUQ_BACKEND}
+  FDB_CLUSTER_FILE: ${NUQ_BACKEND:+/var/fdb/fdb.cluster}
+
+services:
+  playwright-service:
+    image: ghcr.io/firecrawl/playwright-service:latest
+    # build: apps/playwright-service-ts   ← commented out
+    environment:
+      PORT: 3000
+      PROXY_SERVER: ${PROXY_SERVER}
+      PROXY_USERNAME: ${PROXY_USERNAME}
+      PROXY_PASSWORD: ${PROXY_PASSWORD}
+      ALLOW_LOCAL_WEBHOOKS: ${ALLOW_LOCAL_WEBHOOKS}
+      BLOCK_MEDIA: ${BLOCK_MEDIA}
+      MAX_CONCURRENT_PAGES: ${CRAWL_CONCURRENT_REQUESTS:-10}
+    networks:
+      - backend
+    cpus: 2.0
+    mem_limit: 4G
+    memswap_limit: 4G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+    tmpfs:
+      - /tmp/.cache:noexec,nosuid,size=1g
+
+  api:
+    <<: *common-service
+    environment:
+      <<: *common-env
+      HOST: "0.0.0.0"
+      PORT: ${INTERNAL_PORT:-3002}
+      EXTRACT_WORKER_PORT: ${EXTRACT_WORKER_PORT:-3004}
+      WORKER_PORT: ${WORKER_PORT:-3005}
+      NUQ_RABBITMQ_URL: amqp://rabbitmq:5672
+      HARNESS_STARTUP_TIMEOUT_MS: ${HARNESS_STARTUP_TIMEOUT_MS:-60000}
+      ENV: local
+    depends_on:
+      redis:
+        condition: service_started
+      playwright-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3002}:${INTERNAL_PORT:-3002}"
+    volumes:
+      - fdb-cluster-file:/var/fdb:ro
+    command: node dist/src/harness.js --start-docker
+    cpus: 4.0
+    mem_limit: 8G
+    memswap_limit: 8G
+
+  redis:
+    image: redis:alpine
+    networks:
+      - backend
+    command: redis-server --bind 0.0.0.0
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+        compress: "true"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    networks:
+      - backend
+    command: rabbitmq-server
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+        compress: "true"
+
+  nuq-postgres:
+    image: ghcr.io/firecrawl/nuq-postgres:latest
+    # build: apps/nuq-postgres   ← commented out
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  foundationdb:
+    image: foundationdb/foundationdb:7.3.63
+    environment:
+      FDB_NETWORKING_MODE: container
+      FDB_COORDINATOR_PORT: 4500
+    networks:
+      - backend
+    volumes:
+      - fdb-data:/var/fdb/data
+      - fdb-cluster-file:/var/fdb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  foundationdb-init:
+    image: foundationdb/foundationdb:7.3.63
+    depends_on:
+      - foundationdb
+    entrypoint:
+      - /bin/bash
+      - -c
+      - "sleep 5 && out=$(fdbcli -C /var/fdb/fdb.cluster --exec 'configure new single ssd' 2>&1); status=$$?; printf '%s\n' \"$$out\"; if [ \"$$status\" -eq 0 ]; then exit 0; fi; printf '%s\n' \"$$out\" | grep -Eiq 'already.*configured|database.*configured'"
+    volumes:
+      - fdb-cluster-file:/var/fdb
+    networks:
+      - backend
+    restart: "no"
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  fdb-data:
+  fdb-cluster-file:
+```
+
 ---
 
 ## API Usage
 
-All examples target `http://localhost:3002`. Replace with `https://api.1apx.com` for external access via the nginx gateway.
+All examples target `http://localhost:3002`. Replace with `https://your-api-gateway.example.com` for external access via the nginx gateway.
 
 ---
 
@@ -435,17 +781,17 @@ for story in data["data"]["json"]["stories"]:
 
 ### 9. External access via API gateway
 
-All endpoints are available through `https://api.1apx.com` with no additional auth (the gateway is unauthenticated by default):
+All endpoints are available through `https://your-api-gateway.example.com` with no additional auth (the gateway is unauthenticated by default):
 
 ```bash
 # Scrape from anywhere on the internet
-curl -s https://api.1apx.com/v2/scrape \
+curl -s https://your-api-gateway.example.com/v2/scrape \
   -H "Content-Type: application/json" \
   -d '{"url":"https://example.com","formats":["markdown"]}' \
   | jq '.data.metadata.title'
 
 # AI extraction via gateway
-curl -s https://api.1apx.com/v2/scrape \
+curl -s https://your-api-gateway.example.com/v2/scrape \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://news.ycombinator.com",
@@ -559,9 +905,168 @@ Listens on `:8090`. For any path other than `/v1/responses`, it passes the reque
 
 The proxy runs as a systemd service and auto-restarts on failure.
 
+### llama-responses-proxy.py source
+
+```bash
+sudo tee /home/sysadmin/codebase/bin/llama-responses-proxy.py > /dev/null << 'EOF'
+#!/usr/bin/env python3
+"""
+Proxy: translates OpenAI Responses API (/v1/responses) to Chat Completions
+(/v1/chat/completions) for llama-swap compatibility.
+All other paths are forwarded unchanged.
+"""
+import http.server, urllib.request, json, uuid, time, sys
+
+TARGET = "http://localhost:8080"
+PORT = 8090
+
+
+def input_to_messages(input_list):
+    messages = []
+    for item in input_list:
+        role = item.get("role", "user")
+        content = item.get("content", "")
+        if isinstance(content, list):
+            parts = [c.get("text", "") for c in content if c.get("type") in ("input_text", "text")]
+            content = "\n".join(parts)
+        messages.append({"role": role, "content": content})
+    return messages
+
+
+def text_format_to_response_format(text_fmt):
+    if not text_fmt:
+        return None
+    fmt_type = text_fmt.get("type", "text")
+    if fmt_type == "json_schema":
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": text_fmt.get("name", "response"),
+                "strict": text_fmt.get("strict", True),
+                "schema": text_fmt.get("schema", {}),
+            }
+        }
+    elif fmt_type == "json_object":
+        return {"type": "json_object"}
+    return None
+
+
+def chat_response_to_responses(chat_resp, req_id):
+    choice = chat_resp.get("choices", [{}])[0]
+    text = choice.get("message", {}).get("content", "")
+    usage = chat_resp.get("usage", {})
+    return {
+        "id": req_id,
+        "object": "response",
+        "created_at": int(time.time()),
+        "model": chat_resp.get("model", ""),
+        "output": [{
+            "type": "message",
+            "id": "msg_" + req_id,
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": text, "annotations": []}]
+        }],
+        "usage": {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+        },
+        "status": "completed",
+    }
+
+
+class Proxy(http.server.BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        print(f"[llama-responses-proxy] {fmt % args}", flush=True)
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        if self.path.rstrip("/").endswith("/responses"):
+            self._handle_responses(body)
+        else:
+            self._forward(self.path, body)
+
+    def do_GET(self):
+        self._forward(self.path, None)
+
+    def _handle_responses(self, body):
+        req_id = "resp_" + uuid.uuid4().hex[:16]
+        try:
+            req = json.loads(body)
+        except Exception as e:
+            self.send_error(400, str(e))
+            return
+
+        cc_req = {
+            "model": req.get("model", ""),
+            "messages": input_to_messages(req.get("input", [])),
+        }
+        rf = text_format_to_response_format(req.get("text", {}).get("format"))
+        if rf:
+            cc_req["response_format"] = rf
+        if "max_output_tokens" in req:
+            cc_req["max_tokens"] = req["max_output_tokens"]
+
+        print(f"[llama-responses-proxy] /v1/responses → /v1/chat/completions "
+              f"model={cc_req['model']} rf={cc_req.get('response_format', {}).get('type')}", flush=True)
+
+        cc_body = json.dumps(cc_req).encode()
+        fwd_req = urllib.request.Request(
+            TARGET + "/v1/chat/completions", cc_body,
+            {"Content-Type": "application/json", "Content-Length": str(len(cc_body))}
+        )
+        try:
+            resp = urllib.request.urlopen(fwd_req, timeout=300)
+            cc_resp = json.loads(resp.read())
+            out = chat_response_to_responses(cc_resp, req_id)
+            out_bytes = json.dumps(out).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(out_bytes)))
+            self.end_headers()
+            self.wfile.write(out_bytes)
+        except urllib.error.HTTPError as e:
+            data = e.read()
+            print(f"[llama-responses-proxy] upstream error {e.code}: {data[:200]}", flush=True)
+            self.send_response(e.code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data)
+
+    def _forward(self, path, body):
+        headers = {k: v for k, v in self.headers.items()}
+        fwd_req = urllib.request.Request(TARGET + path, body, headers)
+        try:
+            resp = urllib.request.urlopen(fwd_req, timeout=300)
+            data = resp.read()
+            self.send_response(resp.status)
+            for k, v in resp.getheaders():
+                if k.lower() not in ("transfer-encoding",):
+                    self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(data)
+        except urllib.error.HTTPError as e:
+            data = e.read()
+            self.send_response(e.code)
+            self.end_headers()
+            self.wfile.write(data)
+
+
+if __name__ == "__main__":
+    server = http.server.HTTPServer(("0.0.0.0", PORT), Proxy)
+    print(f"[llama-responses-proxy] listening on :{PORT}, forwarding to {TARGET}", flush=True)
+    server.serve_forever()
+EOF
+chmod 755 /home/sysadmin/codebase/bin/llama-responses-proxy.py
+```
+
+### Systemd unit
+
 **`/etc/systemd/system/llama-responses-proxy.service`**
 
-```ini
+```bash
+sudo tee /etc/systemd/system/llama-responses-proxy.service > /dev/null << 'EOF'
 [Unit]
 Description=llama Responses API → Chat Completions proxy (Firecrawl compat)
 After=network.target llama-swap.service
@@ -573,13 +1078,8 @@ User=sysadmin
 
 [Install]
 WantedBy=multi-user.target
-```
+EOF
 
-To install on a fresh machine:
-
-```bash
-sudo cp /home/sysadmin/codebase/bin/llama-responses-proxy.py /home/sysadmin/codebase/bin/
-sudo cp llama-responses-proxy.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now llama-responses-proxy.service
 ```

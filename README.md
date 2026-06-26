@@ -87,6 +87,7 @@ All installation and operational guides are in [`docs/`](docs/).
 | [`docs/openwebui.md`](docs/openwebui.md) | Deploy Open WebUI in Docker, connect to llama-swap, set context windows per model, register MCP tool servers, configure Firecrawl web search and URL RAG, upgrade procedure. |
 | [`docs/apex-gateway.md`](docs/apex-gateway.md) | Deploy the APEX Gateway proxy — full Python source, systemd unit, Oracle APEX configuration, request flow diagram. |
 | [`docs/Firecrawl.md`](docs/Firecrawl.md) | Self-hosted Firecrawl setup — Docker Compose stack, llama-responses-proxy, AI extraction config, Open WebUI integration. |
+| [`docs/lmstudio.md`](docs/lmstudio.md) | LM Studio optional inference tool — daemon management, model loading, inference server on :9000, full `init.lmstudio` script. |
 
 ### Benchmarking
 
@@ -128,6 +129,234 @@ and stays resident. All others load on demand.
 | `Qwen3.5-9B` | 9B Q8_0 | 24.2 t/s | Fast lightweight tier. Full Q8_0 precision at 9B; best choice for quick tasks, latency-sensitive requests, or when the 70B+ models are busy. |
 
 Benchmark results and full model history: [`docs/benchmark_all_models.md`](docs/benchmark_all_models.md) · [`docs/llama-swap.md`](docs/llama-swap.md)
+
+---
+
+## init.status Script Source
+
+`init.status` is the combined health dashboard for all services:
+
+```bash
+sudo tee /home/sysadmin/codebase/bin/init.status > /dev/null << 'STATUSEOF'
+#!/usr/bin/env bash
+# Comprehensive status for all managed services on the DGX Spark
+
+BOLD='\033[1m'; RESET='\033[0m'; GREEN='\033[0;32m'; RED='\033[0;31m'
+YELLOW='\033[0;33m'; CYAN='\033[0;36m'; DIM='\033[2m'
+LINE='────────────────────────────────────────────────────────────────────────────────'
+THIN='╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌'
+
+bytes_to_gib() {
+    local b="$1"
+    if [[ "$b" =~ ^[0-9]+$ ]] && (( b > 1048576 )); then
+        awk "BEGIN{printf \"%.1f GiB\", $b/1073741824}"
+    else echo "—"; fi
+}
+
+svc_state() {
+    local active sub
+    active=$(systemctl show "$1" --property=ActiveState --value 2>/dev/null)
+    sub=$(systemctl show "$1" --property=SubState --value 2>/dev/null)
+    echo "${active}:${sub}"
+}
+svc_since() {
+    systemctl show "$1" --property=ActiveEnterTimestamp --value 2>/dev/null \
+        | sed 's/ [A-Z]*$//' | sed 's/^[A-Z]* //'
+}
+svc_mem() { bytes_to_gib "$(systemctl show "$1" --property=MemoryCurrent --value 2>/dev/null)"; }
+svc_pid() { systemctl show "$1" --property=MainPID --value 2>/dev/null; }
+
+state_label() {
+    case "$1" in
+        active:running)  printf "${GREEN}${BOLD}RUNNING${RESET}" ;;
+        active:exited)   printf "${YELLOW}${BOLD}EXITED ${RESET}" ;;
+        inactive:dead)   printf "${RED}${BOLD}STOPPED${RESET}" ;;
+        failed:*)        printf "${RED}${BOLD}FAILED ${RESET}" ;;
+        *)               printf "${YELLOW}${BOLD}UNKNOWN${RESET}" ;;
+    esac
+}
+
+health_check() {
+    local url="$1" skip="$2"
+    [[ "$skip" == "skip" ]] && return
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 "$url" 2>/dev/null)
+    if [[ "$code" =~ ^[23] ]]; then
+        printf "${DIM}  %-20s  health ${GREEN}%-3s OK${RESET}${DIM}  %s${RESET}\n" "" "$code" "$url"
+    elif [[ "$code" == "000" ]]; then
+        printf "${DIM}  %-20s  health ${RED}%-6s${RESET}${DIM}  %s${RESET}\n" "" "no conn" "$url"
+    else
+        printf "${DIM}  %-20s  health ${YELLOW}%-6s${RESET}${DIM}  %s${RESET}\n" "" "$code" "$url"
+    fi
+}
+
+print_service() {
+    local name="$1" unit="$2" port="$3" url="$4" skip_health="$5"
+    local state since mem pid port_color
+    state=$(svc_state "$unit"); since=$(svc_since "$unit")
+    mem=$(svc_mem "$unit"); pid=$(svc_pid "$unit")
+    if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+        port_color="${GREEN}:${port}${RESET}"
+    else
+        port_color="${RED}:${port} (not listening)${RESET}"
+    fi
+    printf "  ${BOLD}%-20s${RESET}  " "$name"
+    printf "$(state_label "$state")"
+    printf "   port "; printf "${port_color}"
+    printf "   mem %-10s  pid %s\n" "$mem" "$pid"
+    health_check "$url" "$skip_health"
+    [[ -n "$since" ]] && printf "${DIM}  %-20s  since  %s${RESET}\n" "" "$since"
+}
+
+printf "\n${CYAN}${BOLD}  DGX SPARK — SERVICE STATUS   %s${RESET}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+printf "${CYAN}${LINE}${RESET}\n"
+
+print_service "llama-swap"            "llama-swap.service"            "8080"  "http://localhost:8080/v1/models"
+printf "${DIM}  ${THIN}${RESET}\n"
+print_service "openwebui"             "openwebui.service"             "3000"  "http://localhost:3000/health"
+printf "${DIM}  ${THIN}${RESET}\n"
+print_service "apex-gateway"          "apex-gateway.service"          "8766"  "" "skip"
+printf "${DIM}  ${THIN}${RESET}\n"
+print_service "llama-responses-proxy" "llama-responses-proxy.service" "8090"  "" "skip"
+printf "${DIM}  ${THIN}${RESET}\n"
+print_service "llama-server"          "llama-server.service"          "10000" "http://localhost:10000/health"
+printf "${DIM}  %-20s  ${YELLOW}↑ managed by llama-swap — spawned on demand, not a persistent service${RESET}\n" ""
+printf "${CYAN}${LINE}${RESET}\n"
+
+printf "\n${CYAN}${BOLD}  FIRECRAWL (Docker)${RESET}\n"
+printf "${CYAN}${LINE}${RESET}\n"
+
+fc_health=$(curl -s -o /dev/null -w "%{http_code}" --max-time 4 \
+    -X POST http://localhost:3002/v2/scrape \
+    -H "Content-Type: application/json" \
+    -d '{"url":"https://example.com","formats":["markdown"]}' 2>/dev/null)
+
+if [[ "$fc_health" =~ ^2 ]]; then
+    printf "  ${BOLD}%-20s${RESET}  ${GREEN}${BOLD}RUNNING${RESET}   port ${GREEN}:3002${RESET}   health ${GREEN}%s OK${RESET}\n" "firecrawl" "$fc_health"
+else
+    printf "  ${BOLD}%-20s${RESET}  ${RED}${BOLD}STOPPED${RESET}   port ${RED}:3002 (not responding)${RESET}   health ${RED}%s${RESET}\n" "firecrawl" "${fc_health:-no conn}"
+fi
+
+docker compose -f /home/sysadmin/codebase/firecrawl/docker-compose.yaml ps \
+    --format "table {{.Name}}\t{{.Status}}" 2>/dev/null \
+    | tail -n +2 \
+    | while IFS=$'\t' read -r name status; do
+        if [[ "$status" == *"Up"* ]]; then
+            printf "  ${DIM}  %-38s  ${GREEN}%s${RESET}\n" "$name" "$status"
+        else
+            printf "  ${DIM}  %-38s  ${RED}%s${RESET}\n" "$name" "$status"
+        fi
+    done
+
+printf "${CYAN}${LINE}${RESET}\n"
+
+running_json=$(curl -s --max-time 3 http://localhost:8080/running 2>/dev/null)
+model_count=$(curl -s --max-time 3 http://localhost:8080/v1/models 2>/dev/null \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null)
+
+printf "\n${CYAN}${BOLD}  LOADED MODELS (llama-swap)${RESET}   ${DIM}${model_count:-?} registered total${RESET}\n"
+printf "${CYAN}${LINE}${RESET}\n"
+
+if [[ -z "$running_json" ]]; then
+    printf "  ${YELLOW}llama-swap not reachable${RESET}\n"
+else
+    tmp_json=$(mktemp)
+    echo "$running_json" > "$tmp_json"
+    python3 << PYEOF
+import json, sys
+GREEN='\033[0;32m'; YELLOW='\033[0;33m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
+try:
+    with open('$tmp_json') as f:
+        data = json.load(f)
+except Exception as e:
+    print(f"  {YELLOW}Error reading model data: {e}{RESET}"); sys.exit(0)
+models = data.get('running', [])
+if not models:
+    print(f"  {DIM}No models currently loaded{RESET}")
+else:
+    for m in models:
+        model=m.get('model','?'); name=m.get('name',model); state=m.get('state','?')
+        proxy=m.get('proxy','—'); ttl=m.get('ttl',0); cmd=m.get('cmd','')
+        ctx='—'; toks=cmd.split()
+        for i,tok in enumerate(toks):
+            if tok=='--ctx-size' and i+1<len(toks):
+                try: ctx=f"{int(toks[i+1]):,} ctx"
+                except ValueError: pass
+                break
+        port=proxy.split(':')[-1] if proxy not in ('—','') else '—'
+        state_color=GREEN if state=='ready' else YELLOW
+        ttl_str='resident (no TTL)' if ttl==0 else f'TTL {ttl}s'
+        print(f"  {BOLD}{name:<32}{RESET}  {state_color}{state:<8}{RESET}  port :{port}  {ctx}")
+        print(f"  {DIM}{'':32}  {ttl_str}{RESET}")
+PYEOF
+    rm -f "$tmp_json"
+fi
+
+printf "${CYAN}${LINE}${RESET}\n"
+
+if command -v nvidia-smi &>/dev/null; then
+    printf "\n${CYAN}${BOLD}  GPU${RESET}\n"
+    printf "${CYAN}${LINE}${RESET}\n"
+    gpu_info=$(nvidia-smi --query-gpu=name,utilization.gpu,temperature.gpu,power.draw \
+        --format=csv,noheader,nounits 2>/dev/null)
+    total_mem_gib=$(free -g 2>/dev/null | awk '/^Mem:/{print $2}')
+    while IFS=',' read -r gname gpuutil temp power; do
+        gname=$(echo "$gname" | xargs); gpuutil=$(echo "$gpuutil" | xargs)
+        temp=$(echo "$temp" | xargs); power=$(echo "$power" | xargs)
+        printf "  ${BOLD}%-30s${RESET}  GPU %s%%   Temp %s°C   Power %s W   Unified RAM %s GiB\n" \
+            "$gname" "$gpuutil" "$temp" "$power" "${total_mem_gib:-121}"
+    done <<< "$gpu_info"
+    printf "${CYAN}${LINE}${RESET}\n"
+fi
+
+printf "\n"
+STATUSEOF
+sudo chmod 755 /home/sysadmin/codebase/bin/init.status
+```
+
+---
+
+## sync.documentation.sh
+
+`sync.documentation.sh` syncs docs and scripts from this machine to a remote host (e.g. a MacBook) using a multiplexed SSH connection. Edit the three variables at the top before use.
+
+```bash
+tee /home/sysadmin/codebase/bin/sync.documentation.sh > /dev/null << 'EOF'
+#!/bin/bash
+set -euo pipefail
+
+REMOTE_USER="admin"                           # username on the remote machine
+REMOTE_HOST="192.168.X.X"                    # LAN IP of the remote machine
+REMOTE_DIR="/Users/admin/Documents/GitHub/nvidia-dgx-spark-setup"
+
+CONTROL_PATH="/tmp/ssh-mux-%r@%h:%p"
+SSH_OPTS=(-o ControlMaster=auto -o ControlPath="${CONTROL_PATH}" -o ControlPersist=60)
+
+# Open one shared connection (prompts for password once) and keep it alive
+ssh "${SSH_OPTS[@]}" -fN "${REMOTE_USER}@${REMOTE_HOST}"
+
+cleanup() {
+  ssh "${SSH_OPTS[@]}" -O exit "${REMOTE_USER}@${REMOTE_HOST}" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+scp -o ControlPath="${CONTROL_PATH}" README.md "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/."
+scp -o ControlPath="${CONTROL_PATH}" -r docs/* "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/docs/."
+scp -o ControlPath="${CONTROL_PATH}" *.py "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/code/."
+scp -o ControlPath="${CONTROL_PATH}" init* "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/code/."
+
+echo "Sync complete."
+EOF
+chmod 755 /home/sysadmin/codebase/bin/sync.documentation.sh
+```
+
+Usage:
+
+```bash
+cd /home/sysadmin/codebase/bin
+# Edit REMOTE_USER / REMOTE_HOST / REMOTE_DIR at the top of the script first
+./sync.documentation.sh
+```
 
 ---
 

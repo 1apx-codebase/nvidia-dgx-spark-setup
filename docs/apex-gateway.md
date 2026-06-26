@@ -7,7 +7,7 @@ and a `chat_id` UUID, then forwards to the Open WebUI chat completions endpoint.
 
 - **Script:** `/home/sysadmin/codebase/bin/apex.gateway.py`
 - **Listen address:** `0.0.0.0:8766`
-- **Backend:** `http://192.168.1.45:3000/api/chat/completions` (Open WebUI on this machine)
+- **Backend:** `http://localhost:3000/api/chat/completions` (Open WebUI on this machine)
 - **Runtime:** Python 3.13 via Miniforge (`/usr/local/miniforge3`)
 - **Service:** `apex-gateway.service` (systemd)
 
@@ -27,7 +27,7 @@ without modification.
 ## Prerequisites
 
 - Python 3.x available at `/usr/local/miniforge3/bin/python3`
-- Open WebUI running on port 3000 and reachable at `192.168.1.45:3000`
+- Open WebUI running on port 3000 (reachable at `http://localhost:3000` from this machine)
 - The `sysadmin` user has write access to `/var/log/apex-gateway/`
 
 ```bash
@@ -35,7 +35,7 @@ without modification.
 /usr/local/miniforge3/bin/python3 --version   # Python 3.13.x
 
 # Verify Open WebUI is up
-curl -o /dev/null -w "%{http_code}" http://192.168.1.45:3000/health
+curl -o /dev/null -w "%{http_code}" http://localhost:3000/health
 # → 200
 ```
 
@@ -86,7 +86,7 @@ import uuid
 
 BACKEND = os.environ.get(
     "APEX_BACKEND",
-    "http://192.168.1.45:3000/api/chat/completions"
+    "http://localhost:3000/api/chat/completions"
 )
 
 logging.basicConfig(
@@ -194,7 +194,7 @@ Type=simple
 User=sysadmin
 Group=sysadmin
 
-Environment=APEX_BACKEND=http://192.168.1.45:3000/api/chat/completions
+Environment=APEX_BACKEND=http://localhost:3000/api/chat/completions
 ExecStart=/usr/local/miniforge3/bin/python3 /home/sysadmin/codebase/bin/apex.gateway.py
 
 Restart=on-failure
@@ -246,7 +246,7 @@ tail -f /var/log/apex-gateway/apex-gateway.log
 A successful log entry looks like:
 
 ```
-2026-06-23 18:30:55,123 INFO Listening on 0.0.0.0:8766 → http://192.168.1.45:3000/api/chat/completions
+2026-06-23 18:30:55,123 INFO Listening on 0.0.0.0:8766 → http://localhost:3000/api/chat/completions
 2026-06-23 18:31:02,456 INFO model=gpt-oss-120b chat_id=a1b2c3d4-... stream=false
 ```
 
@@ -291,6 +291,52 @@ init.apex-gateway stop
 init.apex-gateway restart
 init.apex-gateway reload    # daemon-reload then restart
 init.apex-gateway status
+```
+
+### Script source
+
+```bash
+sudo tee /home/sysadmin/codebase/bin/init.apex-gateway > /dev/null << 'EOF'
+#!/usr/bin/env bash
+# init.apex-gateway — APEX Gateway Service Manager
+set -euo pipefail
+SERVICE="apex-gateway.service"
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
+success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
+die()     { error "$*"; exit 1; }
+separator() { echo -e "${CYAN}$(printf '─%.0s' {1..60})${RESET}"; }
+require_systemctl() { command -v systemctl &>/dev/null || die "systemctl not found."; }
+usage() {
+    echo -e "\n${BOLD}init.apex-gateway${RESET} — APEX Gateway Service Manager\n"
+    echo -e "${BOLD}COMMANDS${RESET}"
+    echo -e "  start | stop | restart | reload | status | help"
+}
+cmd_start()   { info "Starting ${SERVICE}…"; sudo systemctl start "$SERVICE" && success "Started." || die "Failed."; separator; cmd_status; }
+cmd_stop()    { info "Stopping ${SERVICE}…"; sudo systemctl stop "$SERVICE" && success "Stopped." || die "Failed."; }
+cmd_restart() { info "Restarting ${SERVICE}…"; sudo systemctl restart "$SERVICE" && success "Restarted." || die "Failed."; separator; cmd_status; }
+cmd_reload()  { info "Reloading daemon…"; sudo systemctl daemon-reload && success "Reloaded." || die "Failed."; cmd_restart; }
+cmd_status() {
+    info "Status of ${SERVICE}:"; separator
+    sudo systemctl status "$SERVICE" --no-pager -l || true; separator
+    info "Recent logs:"
+    local since; since=$(systemctl show "$SERVICE" -p ActiveEnterTimestamp --value 2>/dev/null)
+    if [[ -n "$since" && "$since" != "n/a" ]]; then sudo journalctl -u "$SERVICE" --since="$since" --no-pager || true
+    else sudo journalctl -u "$SERVICE" -n 20 --no-pager || true; fi; separator
+}
+main() {
+    require_systemctl
+    case "${1:-help}" in
+        start) cmd_start;; stop) cmd_stop;; restart) cmd_restart;;
+        reload) cmd_reload;; status) cmd_status;; help|--help|-h) usage;;
+        *) error "Unknown command: '$1'"; usage; exit 1;;
+    esac
+}
+main "$@"
+EOF
+sudo chmod 755 /home/sysadmin/codebase/bin/init.apex-gateway
 ```
 
 ---

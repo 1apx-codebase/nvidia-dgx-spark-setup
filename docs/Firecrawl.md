@@ -391,7 +391,7 @@ Firecrawl integrates with Open WebUI for live web search and URL-based RAG. Conf
 ```bash
 curl -s http://localhost:3000/api/v1/auths/signin \
   -H "Content-Type: application/json" \
-  -d '{"email":"aviles.virgil@gmail.com","password":"YOUR_PASSWORD"}' \
+  -d '{"email":"admin@example.com","password":"YOUR_PASSWORD"}' \
   | jq -r '.token'
 ```
 

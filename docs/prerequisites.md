@@ -1,7 +1,7 @@
 # Prerequisites & Software Requirements
 ## NVIDIA DGX Spark (GB10)
 
-This document lists all software required across the four service installations.
+This document lists all software required across all service installations.
 Install everything here before following any individual installation guide.
 
 | Guide | Requires |
@@ -10,6 +10,7 @@ Install everything here before following any individual installation guide.
 | `llama-swap.md` | Go, Git, Make, Miniforge/hf CLI (for model downloads) |
 | `openwebui.md` | Docker |
 | `apex-gateway.md` | Miniforge (Python 3) |
+| `Firecrawl.md` | Docker (Compose plugin), Python 3 (system — for llama-responses-proxy) |
 | `benchmark-guide.md` | Miniforge (Python 3), matplotlib (chart generation) |
 
 ---
@@ -207,3 +208,5 @@ Verify:
 | Miniforge / Python 3 | Python 3.13.12 | apex-gateway, benchmark charts | Miniforge installer |
 | hf CLI | 1.20.1 | model downloads | Included with Miniforge |
 | matplotlib | 3.11.0 | benchmark chart generation | `pip install matplotlib` (in Miniforge) |
+| Python 3 (system) | 3.12+ | llama-responses-proxy (Firecrawl) | Pre-installed on Ubuntu (`/usr/bin/python3`) |
+| Docker Compose plugin | v2+ | Firecrawl Docker stack | Included with Docker via `get.docker.com` |

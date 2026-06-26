@@ -451,4 +451,29 @@ Listens on `:8090`. For any path other than `/v1/responses`, it passes the reque
 3. Forwards to `POST /v1/chat/completions` on llama-swap
 4. Converts the Chat Completions response back to Responses API shape
 
-The proxy runs as a systemd service (`llama-responses-proxy.service`) and auto-restarts on failure.
+The proxy runs as a systemd service and auto-restarts on failure.
+
+**`/etc/systemd/system/llama-responses-proxy.service`**
+
+```ini
+[Unit]
+Description=llama Responses API → Chat Completions proxy (Firecrawl compat)
+After=network.target llama-swap.service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/sysadmin/codebase/bin/llama-responses-proxy.py
+Restart=always
+User=sysadmin
+
+[Install]
+WantedBy=multi-user.target
+```
+
+To install on a fresh machine:
+
+```bash
+sudo cp /home/sysadmin/codebase/bin/llama-responses-proxy.py /home/sysadmin/codebase/bin/
+sudo cp llama-responses-proxy.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now llama-responses-proxy.service
+```

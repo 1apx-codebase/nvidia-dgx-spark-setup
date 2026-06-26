@@ -297,6 +297,8 @@ init.apex-gateway status
 
 ## How It Works
 
+[![APEX Gateway flow](images/apex-gateway-flow.jpg)](images/apex-gateway-flow.jpg)
+
 ```
 Oracle APEX
     │  POST http://<dgx>:8766

@@ -5,6 +5,8 @@ llama-swap is a reverse proxy that sits in front of llama-server and swaps model
 It manages a pool of llama-server child processes, starts the right one when a request arrives for a given
 model ID, and keeps models resident according to a TTL policy.
 
+[![llama-swap flow](images/llama-swap-flow.jpg)](images/llama-swap-flow.jpg)
+
 - **Repository:** https://github.com/mostlygeek/llama-swap
 - **Installed version:** `local_cc77139` (commit `cc77139`), built 2026-03-06
 - **Binary:** `/usr/local/bin/llama-swap` (17.5 MB)

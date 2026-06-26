@@ -5,6 +5,8 @@ Open WebUI is a web-based chat interface for LLMs. On this machine it runs as a 
 pinned to a specific release tag, managed by a systemd service. It connects to llama-swap
 (the local model proxy) as its AI backend.
 
+[![Open WebUI integration](images/openwebui-integration.jpg)](images/openwebui-integration.jpg)
+
 - **Version:** v0.9.5
 - **Image:** `ghcr.io/open-webui/open-webui:v0.9.5`
 - **URL:** `http://<host-ip>:3000`
@@ -281,7 +283,81 @@ MCP tool ID here has no effect — MCP tools require the user to toggle them on 
 
 ---
 
-## 8. Upgrading Open WebUI to a New Version
+## 8. Firecrawl Integration (Web Search & URL RAG)
+
+Firecrawl provides live web search and URL-based RAG loading. OWU calls Firecrawl at
+`http://172.17.0.1:3002` — `172.17.0.1` is the Docker bridge gateway (how the OWU container
+reaches the host). `localhost` and `host.docker.internal` do not work because OWU and Firecrawl
+run on different Docker networks.
+
+### Prerequisites
+
+Firecrawl must be running: `init.firecrawl status`. See [`Firecrawl.md`](Firecrawl.md) for setup.
+
+### Configure via API
+
+Get an admin token first:
+
+```bash
+curl -s http://localhost:3000/api/v1/auths/signin \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"YOUR_PASSWORD"}' \
+  | jq -r '.token'
+```
+
+Then apply the full config in one step:
+
+```python
+python3 - <<'PYEOF'
+import json, urllib.request
+
+TOKEN = "paste-token-here"
+BASE  = "http://localhost:3000"
+HDR   = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+
+req = urllib.request.Request(f"{BASE}/api/v1/retrieval/config", headers=HDR)
+cfg = json.loads(urllib.request.urlopen(req).read())
+
+cfg["web"]["ENABLE_WEB_SEARCH"]      = True
+cfg["web"]["WEB_SEARCH_ENGINE"]      = "firecrawl"
+cfg["web"]["FIRECRAWL_API_BASE_URL"] = "http://172.17.0.1:3002"
+cfg["web"]["FIRECRAWL_API_KEY"]      = "none"
+cfg["web"]["WEB_LOADER_ENGINE"]      = "firecrawl"
+
+body = json.dumps(cfg).encode()
+req2 = urllib.request.Request(f"{BASE}/api/v1/retrieval/config/update",
+                               data=body, headers=HDR, method="POST")
+resp = json.loads(urllib.request.urlopen(req2).read())
+print("WEB_SEARCH_ENGINE:    ", resp["web"]["WEB_SEARCH_ENGINE"])
+print("FIRECRAWL_API_BASE_URL:", resp["web"]["FIRECRAWL_API_BASE_URL"])
+print("WEB_LOADER_ENGINE:    ", resp["web"]["WEB_LOADER_ENGINE"])
+PYEOF
+```
+
+### Usage in chat
+
+| Feature | How to trigger |
+|---|---|
+| Web search | Click the 🌐 globe icon before sending — OWU queries Firecrawl `/v2/search`, embeds results, injects as context |
+| URL RAG | Click the paperclip → paste a URL — OWU calls Firecrawl `/v2/scrape`, extracts markdown, injects as context |
+
+### API flag (programmatic)
+
+```bash
+curl -s http://localhost:3000/api/v1/chat/completions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-oss-120b",
+    "messages": [{"role":"user","content":"What is the latest Python version?"}],
+    "features": {"web_search": true},
+    "stream": false
+  }'
+```
+
+---
+
+## 9. Upgrading Open WebUI to a New Version
 
 1. Pull the new image:
    ```bash
@@ -307,7 +383,7 @@ MCP tool ID here has no effect — MCP tools require the user to toggle them on 
 
 ---
 
-## 9. Service Manager Script
+## 10. Service Manager Script
 
 `/home/sysadmin/codebase/bin/init.openwebui` manages the service:
 
@@ -321,7 +397,7 @@ init.openwebui status
 
 ---
 
-## 10. Key Paths
+## 11. Key Paths
 
 | Path | Purpose |
 |---|---|

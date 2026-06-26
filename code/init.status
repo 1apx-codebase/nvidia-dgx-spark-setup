@@ -99,13 +99,45 @@ printf "${CYAN}${LINE}${RESET}\n"
 
 # ── Services ───────────────────────────────────────────────────────────────────
 
-print_service "llama-swap"        "llama-swap.service"       "8080" "http://localhost:8080/v1/models"
+print_service "llama-swap"              "llama-swap.service"              "8080"  "http://localhost:8080/v1/models"
 printf "${DIM}  ${THIN}${RESET}\n"
-print_service "openwebui"         "openwebui.service"        "3000" "http://localhost:3000/health"
+print_service "openwebui"               "openwebui.service"               "3000"  "http://localhost:3000/health"
 printf "${DIM}  ${THIN}${RESET}\n"
-print_service "apex-gateway"      "apex-gateway.service"     "8766" "" "skip"
+print_service "apex-gateway"            "apex-gateway.service"            "8766"  "" "skip"
 printf "${DIM}  ${THIN}${RESET}\n"
-print_service "llama-server"      "llama-server.service"     "10000" "http://localhost:10000/health"
+print_service "llama-responses-proxy"   "llama-responses-proxy.service"   "8090"  "" "skip"
+printf "${DIM}  ${THIN}${RESET}\n"
+print_service "llama-server"            "llama-server.service"            "10000" "http://localhost:10000/health"
+printf "${DIM}  %-20s  ${YELLOW}↑ managed by llama-swap — spawned on demand, not a persistent service${RESET}\n" ""
+printf "${CYAN}${LINE}${RESET}\n"
+
+# ── Firecrawl (Docker) ─────────────────────────────────────────────────────────
+
+printf "\n${CYAN}${BOLD}  FIRECRAWL (Docker)${RESET}\n"
+printf "${CYAN}${LINE}${RESET}\n"
+
+fc_health=$(curl -s -o /dev/null -w "%{http_code}" --max-time 4 \
+    -X POST http://localhost:3002/v2/scrape \
+    -H "Content-Type: application/json" \
+    -d '{"url":"https://example.com","formats":["markdown"]}' 2>/dev/null)
+
+if [[ "$fc_health" =~ ^2 ]]; then
+    printf "  ${BOLD}%-20s${RESET}  ${GREEN}${BOLD}RUNNING${RESET}   port ${GREEN}:3002${RESET}   health ${GREEN}%s OK${RESET}\n" "firecrawl" "$fc_health"
+else
+    printf "  ${BOLD}%-20s${RESET}  ${RED}${BOLD}STOPPED${RESET}   port ${RED}:3002 (not responding)${RESET}   health ${RED}%s${RESET}\n" "firecrawl" "${fc_health:-no conn}"
+fi
+
+docker compose -f /home/sysadmin/codebase/firecrawl/docker-compose.yaml ps \
+    --format "table {{.Name}}\t{{.Status}}" 2>/dev/null \
+    | tail -n +2 \
+    | while IFS=$'\t' read -r name status; do
+        if [[ "$status" == *"Up"* ]]; then
+            printf "  ${DIM}  %-38s  ${GREEN}%s${RESET}\n" "$name" "$status"
+        else
+            printf "  ${DIM}  %-38s  ${RED}%s${RESET}\n" "$name" "$status"
+        fi
+    done
+
 printf "${CYAN}${LINE}${RESET}\n"
 
 # ── Loaded models ──────────────────────────────────────────────────────────────

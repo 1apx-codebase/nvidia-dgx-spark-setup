@@ -43,15 +43,17 @@ NVIDIA GB10 GPU          ← 121 GiB unified memory, Blackwell (SM 12.1)
 | `llama-swap` | 8080 | Model router — OpenAI-compatible API, dynamic model loading | systemd |
 | `openwebui` | 3000 | Web chat interface (Docker container) | systemd |
 | `apex-gateway` | 8766 | HTTP proxy adapting Oracle APEX requests for Open WebUI | systemd |
-| `llama-server` | 10000 | Standalone single-model inference server (optional) | systemd |
-| `firecrawl` (Docker stack) | 3002 | Web scraping and AI-powered structured extraction | `init.firecrawl` |
 | `llama-responses-proxy` | 8090 | Translates OpenAI Responses API → Chat Completions for llama-swap | systemd |
+| `firecrawl` (Docker stack) | 3002 | Web scraping and AI-powered structured extraction | `init.firecrawl` |
+| `llama-server` | 10000 | GPU inference engine — **not a persistent service**; spawned and managed on demand by llama-swap | llama-swap |
 
 Check all services at once:
 
 ```bash
 init.status
 ```
+
+> **Note:** `llama-server` will show as `STOPPED` in `init.status` — this is expected. llama-swap spawns and terminates llama-server processes on demand as models are loaded and unloaded; it is not a persistent service.
 
 ---
 

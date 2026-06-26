@@ -16,11 +16,16 @@ apex-gateway.py          ← injects stream:false + chat_id
     │  POST :3000
     ▼
 Open WebUI  (Docker)     ← chat interface, model management, tool calling
-    │  OpenAI API :8080
-    ▼
+    │  OpenAI API :8080           │  web search / RAG loader :3002
+    │                             ▼
+    │                    Firecrawl  (Docker)  ← web scraping + AI extraction
+    │                             │  AI extraction calls :8090
+    │                             ▼
+    │                    llama-responses-proxy  ← Responses API → Chat Completions
+    ▼                             │
 llama-swap               ← model router, dynamic process manager
-    │  spawns
-    ▼
+    │  spawns                     │  :8080
+    ▼ ←──────────────────────────-┘
 llama-server             ← GPU inference engine (llama.cpp)
     │
     ▼
@@ -39,6 +44,8 @@ NVIDIA GB10 GPU          ← 121 GiB unified memory, Blackwell (SM 12.1)
 | `openwebui` | 3000 | Web chat interface (Docker container) | systemd |
 | `apex-gateway` | 8766 | HTTP proxy adapting Oracle APEX requests for Open WebUI | systemd |
 | `llama-server` | 10000 | Standalone single-model inference server (optional) | systemd |
+| `firecrawl` (Docker stack) | 3002 | Web scraping and AI-powered structured extraction | `init.firecrawl` |
+| `llama-responses-proxy` | 8090 | Translates OpenAI Responses API → Chat Completions for llama-swap | systemd |
 
 Check all services at once:
 
@@ -56,9 +63,11 @@ init.status
 | Restart llama-swap | `init.llama-swap restart` |
 | Restart Open WebUI | `init.openwebui restart` |
 | Restart APEX gateway | `init.apex-gateway restart` |
+| Restart Firecrawl | `init.firecrawl restart` |
 | Run a model benchmark | `python3 benchmark_models.py --models gpt-oss-120b` |
 | View llama-swap logs | `init.llama-swap logs` |
 | View Open WebUI logs | `init.openwebui logs` |
+| View Firecrawl logs | `init.firecrawl logs` |
 
 ---
 
@@ -75,6 +84,7 @@ All installation and operational guides are in [`docs/`](docs/).
 | [`docs/llama-swap.md`](docs/llama-swap.md) | Install and configure llama-swap — full annotated config YAML, 7 registered models, arg macro reference, model download instructions, systemd unit. |
 | [`docs/openwebui.md`](docs/openwebui.md) | Deploy Open WebUI in Docker, connect to llama-swap, set context windows per model, register MCP tool servers, upgrade procedure. |
 | [`docs/apex-gateway.md`](docs/apex-gateway.md) | Deploy the APEX Gateway proxy — full Python source, systemd unit, Oracle APEX configuration, request flow diagram. |
+| [`docs/Firecrawl.md`](docs/Firecrawl.md) | Self-hosted Firecrawl setup — Docker Compose stack, llama-responses-proxy, AI extraction config, Open WebUI integration. |
 
 ### Benchmarking
 
@@ -129,6 +139,10 @@ Benchmark results and full model history: [`docs/benchmark_all_models.md`](docs/
 | `~/codebase/llama.cpp/` | llama.cpp source repository |
 | `~/codebase/models/gguf/` | Model files (model-shelf layout: `<org>/<repo>/`) |
 | `/home/sysadmin/codebase/bin/apex.gateway.py` | APEX Gateway script |
+| `/home/sysadmin/codebase/firecrawl/` | Firecrawl repo and Docker Compose stack |
+| `/home/sysadmin/codebase/firecrawl/.env` | Firecrawl environment config |
+| `/home/sysadmin/codebase/bin/llama-responses-proxy.py` | Responses API → Chat Completions proxy |
+| `/etc/systemd/system/llama-responses-proxy.service` | Proxy systemd unit |
 | `/var/log/llama/` | llama-server and llama-swap logs |
 | `/var/log/openwebui/` | Open WebUI logs |
 | `/var/log/apex-gateway/` | APEX Gateway logs |

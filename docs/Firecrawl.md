@@ -60,6 +60,8 @@ sed -i 's|^    build: apps/nuq-postgres|    # build: apps/nuq-postgres|' docker-
 
 Alternatively edit manually — look for the three `build:` directives and swap them for `image:` as documented in the [Docker Compose Stack](#docker-compose-stack) section below.
 
+Also add `restart: unless-stopped` to every service (the `x-common-service` anchor covers `api`; the others need it individually). The `foundationdb-init` container is a one-shot initialiser and must keep `restart: "no"`. See the full file in the [Docker Compose Stack](#docker-compose-stack) section.
+
 ### 3. Create the `.env` file
 
 ```bash
@@ -358,6 +360,7 @@ name: firecrawl
 x-common-service: &common-service
   image: ghcr.io/firecrawl/firecrawl
   # build: apps/api   ← commented out; use pre-built image
+  restart: unless-stopped
   ulimits:
     nofile:
       soft: 65535
@@ -424,6 +427,7 @@ services:
       MAX_CONCURRENT_PAGES: ${CRAWL_CONCURRENT_REQUESTS:-10}
     networks:
       - backend
+    restart: unless-stopped
     cpus: 2.0
     mem_limit: 4G
     memswap_limit: 4G
@@ -468,6 +472,7 @@ services:
     networks:
       - backend
     command: redis-server --bind 0.0.0.0
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -480,6 +485,7 @@ services:
     networks:
       - backend
     command: rabbitmq-server
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
       interval: 5s
@@ -502,6 +508,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     networks:
       - backend
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -519,6 +526,7 @@ services:
     volumes:
       - fdb-data:/var/fdb/data
       - fdb-cluster-file:/var/fdb
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:

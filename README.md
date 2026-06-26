@@ -44,7 +44,7 @@ NVIDIA GB10 GPU          ← 121 GiB unified memory, Blackwell (SM 12.1)
 | `openwebui` | 3000 | Web chat interface (Docker container) | systemd |
 | `apex-gateway` | 8766 | HTTP proxy adapting Oracle APEX requests for Open WebUI | systemd |
 | `llama-responses-proxy` | 8090 | Translates OpenAI Responses API → Chat Completions for llama-swap | systemd |
-| `firecrawl` (Docker stack) | 3002 | Web scraping and AI-powered structured extraction | `init.firecrawl` |
+| `firecrawl` (Docker stack) | 3002 | Web scraping and AI-powered structured extraction | `init.firecrawl` / Docker (`restart: unless-stopped`) |
 | `llama-server` | 10000 | GPU inference engine — **not a persistent service**; spawned and managed on demand by llama-swap | llama-swap |
 
 Check all services at once:

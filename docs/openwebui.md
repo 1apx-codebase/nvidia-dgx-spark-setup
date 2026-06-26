@@ -104,6 +104,10 @@ ExecStart=/usr/bin/docker run --name openwebui \
     -v openwebui:/app/backend/data \
     ghcr.io/open-webui/open-webui:v0.9.6
 
+# Note: no --network host or --add-host flag is needed.
+# From inside the container, the host is reachable at 172.17.0.1 (Docker bridge gateway).
+# Use 172.17.0.1 (not localhost) when configuring llama-swap and Firecrawl URLs in the OWU admin panel.
+
 ExecStop=/usr/bin/docker stop openwebui
 ExecStopPost=/usr/bin/docker rm openwebui
 

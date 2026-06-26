@@ -5,7 +5,7 @@ Single-model mode (gpt-oss-120b per-run charts):
     python3 gen_benchmark_charts.py
 
 All-models comparison mode:
-    python3 gen_benchmark_charts.py --json docs/benchmark_all_models.json --output docs/
+    python3 gen_benchmark_charts.py --json docs/benchmark_all_models.json --output docs/images/
 """
 import argparse
 import json
@@ -282,8 +282,8 @@ def main():
     parser.add_argument("--json", metavar="FILE",
                         help="JSON results from benchmark_models.py --json (enables comparison charts)")
     parser.add_argument("--output", metavar="DIR",
-                        default="/home/sysadmin/codebase/bin/docs",
-                        help="Output directory (default: docs/)")
+                        default="/home/sysadmin/codebase/bin/docs/images",
+                        help="Output directory (default: docs/images/)")
     parser.add_argument("--single", action="store_true",
                         help="Also regenerate single-model gpt-oss-120b charts")
     args = parser.parse_args()

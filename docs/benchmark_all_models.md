@@ -27,17 +27,17 @@
 
 ### Comparison Charts
 
-![Performance Overview](comparison_overview.png)
+![Performance Overview](images/comparison_overview.png)
 
-![Generation Speed](comparison_tg_speed.png)
+![Generation Speed](images/comparison_tg_speed.png)
 
-![Time to First Token](comparison_ttft.png)
+![Time to First Token](images/comparison_ttft.png)
 
-![Prompt Processing Speed](comparison_pp_speed.png)
+![Prompt Processing Speed](images/comparison_pp_speed.png)
 
-![KV Cache Hit Rate](comparison_cache.png)
+![KV Cache Hit Rate](images/comparison_cache.png)
 
-![Speed vs TTFT Scatter](comparison_scatter.png)
+![Speed vs TTFT Scatter](images/comparison_scatter.png)
 
 ---
 

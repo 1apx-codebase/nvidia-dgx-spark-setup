@@ -31,11 +31,11 @@
 
 ## Charts
 
-![Key Metrics Summary](benchmark_summary.png)
+![Key Metrics Summary](images/benchmark_summary.png)
 
-![Generation Speed per Run](benchmark_tg_speed.png)
+![Generation Speed per Run](images/benchmark_tg_speed.png)
 
-![Prompt Processing Speed per Run](benchmark_pp_speed.png)
+![Prompt Processing Speed per Run](images/benchmark_pp_speed.png)
 
 ## System
 

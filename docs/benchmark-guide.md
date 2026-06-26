@@ -7,7 +7,7 @@ covers generation speed, prompt processing speed, time to first token, and KV-ca
 
 - **Script:** `/home/sysadmin/codebase/bin/benchmark_models.py`
 - **Chart script:** `/home/sysadmin/codebase/bin/gen_benchmark_charts.py`
-- **Output:** markdown report (default: `benchmark_<YYYYMMDD_HHMM>.md`) + PNG charts in `docs/`
+- **Output:** markdown report (default: `benchmark_<YYYYMMDD_HHMM>.md`) + PNG charts in `docs/images/`
 - **Requires:** llama-swap running on `http://localhost:8080`
 - **Runtime:** Python 3 stdlib only (benchmark); matplotlib required for chart generation (see `prerequisites.md`)
 
@@ -218,15 +218,15 @@ Existing results are in:
 | `docs/benchmark_gpt-oss-120b.md` | Single-model gpt-oss-120b report (3 iterations, 2026-06-25) |
 | `docs/benchmark_all_models.md` | All-models comparison report (7 models, 2026-06-25) |
 | `docs/benchmark_all_models.json` | Raw JSON results from all-models run (input to chart script) |
-| `docs/benchmark_tg_speed.png` | gpt-oss-120b generation speed per run |
-| `docs/benchmark_pp_speed.png` | gpt-oss-120b prompt processing per run |
-| `docs/benchmark_summary.png` | gpt-oss-120b key metrics summary |
-| `docs/comparison_overview.png` | All-models overview: TG speed + TTFT side by side |
-| `docs/comparison_tg_speed.png` | All-models generation speed bar chart |
-| `docs/comparison_ttft.png` | All-models time to first token bar chart |
-| `docs/comparison_pp_speed.png` | All-models prompt processing speed bar chart |
-| `docs/comparison_cache.png` | All-models KV cache hit rate bar chart |
-| `docs/comparison_scatter.png` | All-models speed vs TTFT scatter |
+| `docs/images/benchmark_tg_speed.png` | gpt-oss-120b generation speed per run |
+| `docs/images/benchmark_pp_speed.png` | gpt-oss-120b prompt processing per run |
+| `docs/images/benchmark_summary.png` | gpt-oss-120b key metrics summary |
+| `docs/images/comparison_overview.png` | All-models overview: TG speed + TTFT side by side |
+| `docs/images/comparison_tg_speed.png` | All-models generation speed bar chart |
+| `docs/images/comparison_ttft.png` | All-models time to first token bar chart |
+| `docs/images/comparison_pp_speed.png` | All-models prompt processing speed bar chart |
+| `docs/images/comparison_cache.png` | All-models KV cache hit rate bar chart |
+| `docs/images/comparison_scatter.png` | All-models speed vs TTFT scatter |
 
 ---
 
@@ -254,20 +254,20 @@ python3 /home/sysadmin/codebase/bin/gen_benchmark_charts.py \
 
 | File | Chart |
 |---|---|
-| `docs/comparison_overview.png` | Two-panel: TG speed + TTFT for all models side by side |
-| `docs/comparison_tg_speed.png` | Horizontal bar: TG t/s sorted fastest first |
-| `docs/comparison_ttft.png` | Horizontal bar: TTFT (ms) sorted by TG speed |
-| `docs/comparison_pp_speed.png` | Horizontal bar: PP t/s for all models |
-| `docs/comparison_cache.png` | Horizontal bar: KV cache hit rate % |
-| `docs/comparison_scatter.png` | Scatter: TG speed vs TTFT positioning |
+| `docs/images/comparison_overview.png` | Two-panel: TG speed + TTFT for all models side by side |
+| `docs/images/comparison_tg_speed.png` | Horizontal bar: TG t/s sorted fastest first |
+| `docs/images/comparison_ttft.png` | Horizontal bar: TTFT (ms) sorted by TG speed |
+| `docs/images/comparison_pp_speed.png` | Horizontal bar: PP t/s for all models |
+| `docs/images/comparison_cache.png` | Horizontal bar: KV cache hit rate % |
+| `docs/images/comparison_scatter.png` | Scatter: TG speed vs TTFT positioning |
 
 **Single-model charts** (hardcoded `gpt-oss-120b` data — update constants when data changes):
 
 | File | Chart |
 |---|---|
-| `docs/benchmark_summary.png` | Horizontal bar overview — all key metrics vs reference maximums |
-| `docs/benchmark_tg_speed.png` | Generation speed per run — shows run-to-run consistency |
-| `docs/benchmark_pp_speed.png` | Prompt processing per run — log scale; cache-warm outliers annotated |
+| `docs/images/benchmark_summary.png` | Horizontal bar overview — all key metrics vs reference maximums |
+| `docs/images/benchmark_tg_speed.png` | Generation speed per run — shows run-to-run consistency |
+| `docs/images/benchmark_pp_speed.png` | Prompt processing per run — log scale; cache-warm outliers annotated |
 
 > **Note:** After updating `gpt-oss-120b` benchmark data, update the `TG_RUNS`, `PP_RUNS`,
 > `TTFT_MS`, and `CACHE_HIT` constants in `gen_benchmark_charts.py`.

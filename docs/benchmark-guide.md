@@ -52,6 +52,8 @@ python3 benchmark_models.py [OPTIONS]
 | `--all` | off | Benchmark every model registered in llama-swap |
 | `--iterations N` | 3 | Number of timed runs per test (higher = tighter statistics) |
 | `--output FILE` | `benchmark_<date>.md` | Output file path |
+| `--json FILE` | off | Also save raw results as JSON (required for `gen_benchmark_charts.py`) |
+| `--sleep-between N` | 0 | Sleep N seconds between models; use with `globalTTL` to ensure clean memory cycling |
 
 `--models` and `--all` are mutually exclusive. If neither is given, the script benchmarks
 only the currently loaded model(s) — the safest default, since loading a new model evicts
@@ -150,8 +152,17 @@ python3 benchmark_models.py --models gpt-oss-120b --iterations 1
 ### Full suite (all models — allow several hours)
 
 ```bash
-python3 benchmark_models.py --all --output docs/benchmark_all_$(date +%Y%m%d).md
+# With memory cycling and JSON output for chart generation
+python3 benchmark_models.py \
+    --all \
+    --iterations 3 \
+    --sleep-between 90 \
+    --output docs/benchmark_all_models.md \
+    --json docs/benchmark_all_models.json
 ```
+
+`--sleep-between 90` requires `globalTTL: 60` in the llama-swap config so each model
+unloads before the next one loads. Restore `globalTTL: 0` after benchmarking.
 
 ---
 
@@ -165,6 +176,12 @@ llama-swap will load it during the warmup. Only the timed iterations are include
 llama-swap manages memory automatically. Benchmarking multiple models in sequence will cause
 each to load and unload in turn. Allow extra time when using `--all` or benchmarking large
 models like `Qwen3-72B`.
+
+**`--mlock` pins models in memory.**
+With `--mlock` in args1, models pin their weights in RAM. When running `--all`, set
+`globalTTL: 60` and use `--sleep-between 90` so the previous model fully unpins before the
+next one loads. The 90s window (> 60s TTL) ensures memory is available for the next model.
+Restore `globalTTL: 0` after the benchmark to keep gpt-oss-120b resident permanently.
 
 **`gpt-oss-120b` uses extended thinking.**
 llama-swap injects `reasoning_effort: high` for every request to `gpt-oss-120b`. This means
@@ -198,23 +215,53 @@ Existing results are in:
 
 | File | Contents |
 |---|---|
-| `docs/benchmark_gpt-oss-120b.md` | Latest gpt-oss-120b benchmark (3 iterations, 2026-06-25) |
-| `docs/benchmark_tg_speed.png` | Generation speed per run chart |
-| `docs/benchmark_pp_speed.png` | Prompt processing speed per run chart |
-| `docs/benchmark_summary.png` | Key metrics summary chart |
+| `docs/benchmark_gpt-oss-120b.md` | Single-model gpt-oss-120b report (3 iterations, 2026-06-25) |
+| `docs/benchmark_all_models.md` | All-models comparison report (7 models, 2026-06-25) |
+| `docs/benchmark_all_models.json` | Raw JSON results from all-models run (input to chart script) |
+| `docs/benchmark_tg_speed.png` | gpt-oss-120b generation speed per run |
+| `docs/benchmark_pp_speed.png` | gpt-oss-120b prompt processing per run |
+| `docs/benchmark_summary.png` | gpt-oss-120b key metrics summary |
+| `docs/comparison_overview.png` | All-models overview: TG speed + TTFT side by side |
+| `docs/comparison_tg_speed.png` | All-models generation speed bar chart |
+| `docs/comparison_ttft.png` | All-models time to first token bar chart |
+| `docs/comparison_pp_speed.png` | All-models prompt processing speed bar chart |
+| `docs/comparison_cache.png` | All-models KV cache hit rate bar chart |
+| `docs/comparison_scatter.png` | All-models speed vs TTFT scatter |
 
 ---
 
 ## Chart Generation
 
-After running a benchmark, regenerate the PNG charts with:
+After running a benchmark, generate PNG charts with:
 
 ```bash
+# All-models comparison charts (from JSON output)
+python3 /home/sysadmin/codebase/bin/gen_benchmark_charts.py \
+    --json docs/benchmark_all_models.json \
+    --output docs/
+
+# Single-model per-run charts only (hardcoded gpt-oss-120b data)
 python3 /home/sysadmin/codebase/bin/gen_benchmark_charts.py
+
+# Both: comparison + single-model
+python3 /home/sysadmin/codebase/bin/gen_benchmark_charts.py \
+    --json docs/benchmark_all_models.json \
+    --output docs/ \
+    --single
 ```
 
-This reads the hardcoded results from the latest `gpt-oss-120b` benchmark run and writes
-three PNGs directly to `docs/`:
+**Comparison charts** (from `--json`):
+
+| File | Chart |
+|---|---|
+| `docs/comparison_overview.png` | Two-panel: TG speed + TTFT for all models side by side |
+| `docs/comparison_tg_speed.png` | Horizontal bar: TG t/s sorted fastest first |
+| `docs/comparison_ttft.png` | Horizontal bar: TTFT (ms) sorted by TG speed |
+| `docs/comparison_pp_speed.png` | Horizontal bar: PP t/s for all models |
+| `docs/comparison_cache.png` | Horizontal bar: KV cache hit rate % |
+| `docs/comparison_scatter.png` | Scatter: TG speed vs TTFT positioning |
+
+**Single-model charts** (hardcoded `gpt-oss-120b` data — update constants when data changes):
 
 | File | Chart |
 |---|---|
@@ -222,8 +269,8 @@ three PNGs directly to `docs/`:
 | `docs/benchmark_tg_speed.png` | Generation speed per run — shows run-to-run consistency |
 | `docs/benchmark_pp_speed.png` | Prompt processing per run — log scale; cache-warm outliers annotated |
 
-> **Note:** Update the data constants at the top of `gen_benchmark_charts.py` after each new
-> benchmark run (`TG_RUNS`, `TTFT_RUNS`, `PP_RUNS`, etc.).
+> **Note:** After updating `gpt-oss-120b` benchmark data, update the `TG_RUNS`, `PP_RUNS`,
+> `TTFT_MS`, and `CACHE_HIT` constants in `gen_benchmark_charts.py`.
 
 ---
 

@@ -157,7 +157,7 @@ models:
 
   # 120B — quality leader, loads at service start
   gpt-oss-120b:
-    loadOnStart: true          # 56.8 t/s; ~60 GB weights + ~12 GB KV (4 slots) + 32 GB cache ≈ 104 GB
+    loadOnStart: true          # 56.2 t/s; ~60 GB weights + ~12 GB KV (4 slots) + 32 GB cache ≈ 104 GB
     cmd: ${latest-llama} ${args1} ${args2} --ctx-size 131072 --parallel 4 \
          --model ${models_dir}/openai/gpt-oss-120b-MXFP4-GGUF/gpt-oss-120b-mxfp4-00001-of-00003.gguf
     name: "gpt-oss-120B"
@@ -211,15 +211,17 @@ YAML
 7 models are active, selected from a full benchmark run on 2026-06-24 as the highest-value set
 across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) for raw results.
 
-| Model | Size / Quant | Speed | Role | Why selected |
-|---|---|---|---|---|
-| `gpt-oss-120b` | 120B MXFP4 | **56.8 t/s** | **Default** | Clear quality leader; OpenAI open-source arch, 131K ctx, 4 parallel slots. Fastest high-quality model on this machine. Loads at startup. |
-| `Qwen3-72B` | 72B Q5_K_M | — | General | Best general-purpose 72B. Qwen3 generation outperforms Qwen2.5 at the same parameter count on MMLU, reasoning, and instruction-following. |
-| `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 t/s | Reasoning | Best reasoning model in the lineup. Chain-of-thought distill of DeepSeek R1 on a Llama-70B base; strong on multi-step reasoning, math, and debugging. |
-| `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.4 t/s | Code | Best dedicated code model. Q8_0 near-lossless precision, 128K native context. Outperforms larger general models on HumanEval and code tasks. |
-| `Nemotron-Nano-Omni-30B` | 30B Q8_0 | — | Vision | Only model with image input support (`--mmproj`). Vision + reasoning in one; use for multimodal tasks. |
-| `Codestral-22B` | 22B Q8_0 | — | SQL/Code | Mistral-trained SQL and code specialist. Strongest model for structured queries and database work alongside the general coder. |
-| `Qwen3.5-9B` | 9B Q8_0 | 23.6 t/s | Lightweight | Fast lightweight tier. Full Q8_0 precision; best choice for quick tasks, latency-sensitive requests, or when 70B+ models are busy. |
+| Model | Size / Quant | TG t/s | TTFT | Role | Why selected |
+|---|---|---|---|---|---|
+| `gpt-oss-120b` | 120B MXFP4 | **56.2** | 82 ms | **Default** | Clear quality leader; OpenAI open-source arch, 131K ctx, 4 parallel slots. Fastest high-quality model on this machine. Loads at startup. |
+| `Qwen3-72B` | 72B Q5_K_M | 3.8 | 273 ms | General | Best general-purpose 72B. Qwen3 generation outperforms Qwen2.5 at the same parameter count on MMLU, reasoning, and instruction-following. |
+| `DeepSeek-R1-70B` | 70B Q5_K_M | 4.0 | 258 ms | Reasoning | Best reasoning model in the lineup. Chain-of-thought distill of DeepSeek R1 on a Llama-70B base; strong on multi-step reasoning, math, and debugging. |
+| `Qwen2.5-Coder-32B` | 32B Q8_0 | 6.5 | 164 ms | Code | Best dedicated code model. Q8_0 near-lossless precision, 128K native context. Outperforms larger general models on HumanEval and code tasks. |
+| `Nemotron-Nano-Omni-30B` | 30B Q8_0 | 57.3 | 114 ms | Vision | Only model with image input support (`--mmproj`). Vision + reasoning in one; use for multimodal tasks. |
+| `Codestral-22B` | 22B Q8_0 | 9.5 | 110 ms | SQL/Code | Mistral-trained SQL and code specialist. Strongest model for structured queries and database work alongside the general coder. |
+| `Qwen3.5-9B` | 9B Q8_0 | 24.2 | 73 ms | Lightweight | Fast lightweight tier. Full Q8_0 precision; best choice for quick tasks, latency-sensitive requests, or when 70B+ models are busy. |
+
+> Benchmark: 3 iterations, 2026-06-25, NVIDIA DGX Spark (GB10). Full results: [`benchmark_all_models.md`](benchmark_all_models.md)
 
 ---
 

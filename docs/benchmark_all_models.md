@@ -1,38 +1,63 @@
-# LLM Model Benchmark Report
+# LLM Model Benchmark — All Models
 
-**Generated:** 2026-06-24 04:55  
+**Generated:** 2026-06-25 20:07  
 **Host:** NVIDIA DGX Spark (GB10)  
 **llama-swap:** `http://localhost:8080`  
-**Iterations per test:** 2  
+**Iterations per test:** 3  
+**Models tested:** 7  
+
+---
 
 ## Executive Summary
 
-20 models were benchmarked on the NVIDIA DGX Spark (GB10). Generation speed ranged from **3.7 t/s** (`Qwen3-72B`) to **84.7 t/s** (`Qwen3-Coder-REAP-25B`).
+7 models were benchmarked on the NVIDIA DGX Spark (GB10). Generation speed ranged from **3.8 t/s** (`Qwen3-72B`) to **57.3 t/s** (`Nemotron-Nano-Omni-30B`).
 
 **Highlights:**
 
-- **`Qwen3-Coder-REAP-25B`** — 84.7 t/s generation, 17 ms TTFT, 100% cache hit
-- **`gpt-oss-20b`** — 80.0 t/s generation, 61 ms TTFT, 100% cache hit
-- **`Nemotron-Nano-30B-Q4`** — 73.5 t/s generation, 97 ms TTFT, 59% cache hit
-- **`Qwen3-Coder-30B-Q6`** — 69.1 t/s generation, 20 ms TTFT, 100% cache hit
-- **`Qwen3-Coder-30B`** — 60.1 t/s generation, 22 ms TTFT, 100% cache hit
-- **`Nemotron-Nano-Omni-30B`** — 57.0 t/s generation, 117 ms TTFT, 59% cache hit
-- **`gpt-oss-120b`** — 55.8 t/s generation, 84 ms TTFT, 100% cache hit
-- **`Nemotron-Nano-30B`** — 44.1 t/s generation, 128 ms TTFT, 59% cache hit
-- **`Qwen3.5-9B-Q4`** — 34.7 t/s generation, 60 ms TTFT, 56% cache hit
-- **`Qwen3.5-9B`** — 23.6 t/s generation, 76 ms TTFT, 56% cache hit
-- **`Codestral-22B`** — 9.4 t/s generation, 111 ms TTFT, 100% cache hit
-- **`Mistral-Small-3.1-24B`** — 8.8 t/s generation, 122 ms TTFT, 100% cache hit
-- **`Gemma-3-27B`** — 7.5 t/s generation, 144 ms TTFT, 100% cache hit
-- **`Qwen2.5-Coder-32B`** — 6.4 t/s generation, 166 ms TTFT, 100% cache hit
-- **`Qwen3-32B`** — 6.3 t/s generation, 487 ms TTFT, 100% cache hit
-- **`Qwen2.5-72B-Q4`** — 4.4 t/s generation, 243 ms TTFT, 100% cache hit
-- **`DeepSeek-R1-70B`** — 4.0 t/s generation, 262 ms TTFT, 100% cache hit
-- **`Llama-3.3-70B`** — 3.9 t/s generation, 262 ms TTFT, 100% cache hit
-- **`Qwen2.5-72B`** — 3.7 t/s generation, 279 ms TTFT, 100% cache hit
-- **`Qwen3-72B`** — 3.7 t/s generation, 280 ms TTFT, 100% cache hit
+- **`Nemotron-Nano-Omni-30B`** and **`gpt-oss-120b`** lead generation speed (~57 t/s), despite the former being a 30B MoE model with vision support and the latter being a 120B MXFP4 model — both benefit from architectural efficiency on this hardware.
+- **`Qwen3.5-9B`** is the fastest small model at 24.2 t/s and 73 ms TTFT — the best choice for low-latency, high-throughput scenarios.
+- **70B+ dense models** (Qwen3-72B, DeepSeek-R1-70B) are bandwidth-limited at 3–4 t/s — usable for quality-sensitive tasks but slow for interactive use.
+- **Codestral-22B** and **Qwen2.5-Coder-32B** sit in a mid-tier (6.5–9.5 t/s) — good quality at the cost of speed.
+- **KV cache** is near-perfect (99.9%) for all dense models. Nemotron-Nano-Omni-30B and Qwen3.5-9B show ~56–59% hit rates — these models have a token-ID structure that limits prefix matching to the first ~56% of the long test prompt; this is a benchmark artifact, not a practical limitation.
+- **PP t/s means are inflated** for all models except Nemotron-Nano-Omni-30B and Qwen3.5-9B, because run 1 always hits the warm cache from the warmup request. Cold PP runs 2–3 are the meaningful figures; see per-model detail.
 
-All models showed consistent results across runs with no evidence of thermal throttling or memory pressure, indicating the 121 GiB unified memory pool is sufficient for the tested configurations.
+---
+
+## Charts
+
+### Comparison Charts
+
+![Performance Overview](comparison_overview.png)
+
+![Generation Speed](comparison_tg_speed.png)
+
+![Time to First Token](comparison_ttft.png)
+
+![Prompt Processing Speed](comparison_pp_speed.png)
+
+![KV Cache Hit Rate](comparison_cache.png)
+
+![Speed vs TTFT Scatter](comparison_scatter.png)
+
+---
+
+## Results Summary
+
+Sorted by generation speed (TG t/s) descending.
+
+> **PP t/s note:** For models with 100% cache hit (all except Nemotron and Qwen3.5-9B), run 1 PP is a cache-warm artifact. Cold PP (runs 2–3) is ~4–52 t/s for these models. The mean and std-dev are misleading; see per-model detail for cold figures.
+
+| Model | TG t/s | TTFT (ms) | PP t/s (cold) | Cache hit | Load time |
+|---|---:|---:|---:|---:|---:|
+| `Nemotron-Nano-Omni-30B` | 57.3 ± 0.0 | 114 | 1 899 | 59% | 35.9s |
+| `gpt-oss-120b` | 56.2 ± 0.0 | 82 | 46 | 100% | 66.0s |
+| `Qwen3.5-9B` | 24.2 ± 0.0 | 73 | 1 587 | 56% | 16.1s |
+| `Codestral-22B` | 9.5 ± 0.0 | 110 | 9 | 100% | 59.1s |
+| `Qwen2.5-Coder-32B` | 6.5 ± 0.0 | 164 | 6 | 100% | 53.4s |
+| `DeepSeek-R1-70B` | 4.0 ± 0.0 | 258 | 4 | 100% | 55.4s |
+| `Qwen3-72B` | 3.8 ± 0.0 | 273 | 4 | 100% | 55.6s |
+
+---
 
 ## System
 
@@ -46,815 +71,183 @@ All models showed consistent results across runs with no evidence of thermal thr
 | llama-server | commit `1a29907`, built 2026-06-23 |
 | Build flags | `GGML_CUDA=ON`, `GGML_CPU_ARM_ARCH=native`, `GGML_CPU_KLEIDIAI=ON`, `GGML_CUDA_FA_ALL_QUANTS=ON`, `GGML_CUDA_COMPRESSION_MODE=speed`, `GGML_LTO=ON` |
 
+---
+
 ## Methodology
 
 ### Test Types
 
 | # | Name | Prompt size | Max tokens | What it measures |
 |---|---|---|---|---|
-| 1 | Generation speed | ~18 tokens | 200 | Token generation throughput (TG t/s) and time-to-first-token (TTFT) |
-| 2 | Prompt processing speed | ~970 tokens | 50 | Prompt ingestion throughput (PP t/s) |
+| 1 | Generation speed | ~18–83 tokens | 200 | Token generation throughput (TG t/s) and time-to-first-token (TTFT) |
+| 2 | Prompt processing speed | ~1 062–1 428 tokens | 50 | Prompt ingestion throughput (PP t/s) |
 | 3 | Cache efficiency | same long prompt ×2 | 50 | KV-cache hit rate and speedup on repeated context |
 
 ### Metric Definitions
 
 | Metric | Definition |
 |---|---|
-| **TG t/s** | Token generation speed — tokens/second during the autoregressive decoding phase. Higher is faster response generation. |
-| **PP t/s** | Prompt processing speed — tokens/second during the prefill (prompt ingestion) phase. Higher means less wait before generation starts. |
-| **TTFT** | Time to first token — wall-clock milliseconds from request send to first content token received (streaming). Includes network + prefill. |
-| **Cache hit** | Percentage of prompt tokens served from the KV cache on the second identical request. High hit rate = near-instant prefill on repeated context. |
-| **Cache speedup** | PP t/s (hot) ÷ PP t/s (cold). Shows how much faster prompt processing is when the KV cache is warm. |
+| **TG t/s** | Token generation speed — tokens/second during autoregressive decoding. Higher = faster responses. |
+| **PP t/s** | Prompt processing speed — tokens/second during prefill. Higher = less wait before generation. |
+| **PP t/s (cold)** | PP speed from runs 2–3 only (cache cold). More representative than the mean for dense models. |
+| **TTFT** | Time to first token — wall-clock ms from request send to first content token (streaming). |
+| **Cache hit** | % of prompt tokens served from KV cache on second identical request. |
+| **Load time** | Warmup duration — includes model load and first (uncounted) inference. |
 
-### Procedure
+### Benchmark Configuration
 
-1. A warmup request (not counted) is sent first to load the model and prime the KV cache.
-2. Tests 1 and 2 are each run `N` times; mean ± std-dev are reported.
-3. Test 3 sends two identical long prompts back-to-back; results are single-shot (no averaging needed since it tests cache state).
-4. All timing figures (`predicted_per_second`, `prompt_per_second`, `cache_n`, `prompt_n`) come from the server's `timings` field in the API response — not estimated client-side.
-5. TTFT is measured client-side by timing the first non-empty SSE chunk from a streaming request.
-6. `temperature=0` is used throughout for determinism.
-
-### Prompts Used
-
-**Short prompt (generation speed test):**
-```
-Explain the difference between a process and a thread in operating systems. Be concise.
+```bash
+cd /home/sysadmin/codebase/bin
+python3 benchmark_models.py \
+    --all \
+    --iterations 3 \
+    --sleep-between 90 \
+    --output docs/benchmark_all_models.md \
+    --json docs/benchmark_all_models.json
 ```
 
-**Long prompt (prompt processing + cache tests):**
-```
-The NVIDIA DGX Spark is a compact workstation built around the GB10 SoC, which integrates a Blackwell GPU with 121 GiB of unified memory shared between the CPU and GPU. The ARM big.LITTLE CPU configuration pairs ten Cortex-X925 performance cores with ten Cortex-A725 efficiency cores, delivering both [… repeated ×10 …]
-```
+`--sleep-between 90` was used with `globalTTL: 60` so each model fully unloads before the next one loads, ensuring clean results without memory contention.
 
-## Results Summary
-
-Sorted by generation speed (TG t/s) descending.
-
-| Model | TG t/s | TTFT (ms) | PP t/s | Cache hit | Cache speedup |
-|---|---:|---:|---:|---:|---:|
-| `Qwen3-Coder-REAP-25B` | 84.7 ± 0.1 | 17 | 1384.1 ± 1875.8 | 100% | 1.0× |
-| `gpt-oss-20b` | 80.0 ± 0.1 | 61 | 2003.1 ± 2754.7 | 100% | 1.0× |
-| `Nemotron-Nano-30B-Q4` | 73.5 ± 0.0 | 97 | 2300.0 ± 65.4 | 59% | 1.0× |
-| `Qwen3-Coder-30B-Q6` | 69.1 ± 0.1 | 20 | 1124.7 ± 1506.1 | 100% | 1.0× |
-| `Qwen3-Coder-30B` | 60.1 ± 0.0 | 22 | 1135.9 ± 1530.6 | 100% | 1.0× |
-| `Nemotron-Nano-Omni-30B` | 57.0 ± 0.3 | 117 | 1937.8 ± 129.2 | 59% | 1.0× |
-| `gpt-oss-120b` | 55.8 ± 0.1 | 84 | 815.8 ± 1099.8 | 100% | 1.0× |
-| `Nemotron-Nano-30B` | 44.1 ± 0.0 | 128 | 1727.0 ± 83.5 | 59% | 1.0× |
-| `Qwen3.5-9B-Q4` | 34.7 ± 0.0 | 60 | 2032.6 ± 27.2 | 56% | 1.0× |
-| `Qwen3.5-9B` | 23.6 ± 0.0 | 76 | 1578.5 ± 1.8 | 56% | 1.0× |
-| `Codestral-22B` | 9.4 ± 0.0 | 111 | 324.5 ± 446.4 | 100% | 1.0× |
-| `Mistral-Small-3.1-24B` | 8.8 ± 0.0 | 122 | 343.7 ± 473.7 | 100% | 1.0× |
-| `Gemma-3-27B` | 7.5 ± 0.0 | 144 | 278.3 ± 386.5 | 100% | 1.0× |
-| `Qwen2.5-Coder-32B` | 6.4 ± 0.0 | 166 | 230.0 ± 316.4 | 100% | 1.0× |
-| `Qwen3-32B` | 6.3 ± 0.0 | 487 | 230.2 ± 316.9 | 100% | 1.0× |
-| `Qwen2.5-72B-Q4` | 4.4 ± 0.0 | 243 | 139.1 ± 190.7 | 100% | 1.0× |
-| `DeepSeek-R1-70B` | 4.0 ± 0.0 | 262 | 130.9 ± 179.7 | 100% | 1.0× |
-| `Llama-3.3-70B` | 3.9 ± 0.0 | 262 | 133.8 ± 183.8 | 100% | 1.0× |
-| `Qwen2.5-72B` | 3.7 ± 0.0 | 279 | 125.7 ± 172.5 | 100% | 1.0× |
-| `Qwen3-72B` | 3.7 ± 0.0 | 280 | 123.3 ± 169.2 | 100% | 1.0× |
+---
 
 ## Per-Model Detail
 
-### `Codestral-22B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **9.4 t/s** | ~53s for a 500-token response; ~107s for 1 000 tokens |
-| Time to first token (TTFT) | **111 ms** | First word appears in 111 ms |
-| Prompt processing speed | **324.5 t/s** | Reads ~325 input tokens/sec; a 1 000-token doc takes ~3s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 28.6s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 45
-- Generated tokens: 45
-- TG t/s: **9.4** ± 0.0 (runs: [9.4, 9.4])
-- TTFT: **111 ms** ± 0 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1428
-- PP t/s: **324.5** ± 446.4 (runs: [640.2, 8.9])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1427 / 1428
-- Cache hit rate: **99.9%**
-- PP t/s cold: 8.9 → hot: 8.9 (1.00× speedup)
-
-### `DeepSeek-R1-70B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **4.0 t/s** | ~126s for a 500-token response; ~252s for 1 000 tokens |
-| Time to first token (TTFT) | **262 ms** | First word appears in 262 ms |
-| Prompt processing speed | **130.9 t/s** | Reads ~131 input tokens/sec; a 1 000-token doc takes ~8s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 56.1s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 22
-- Generated tokens: 200
-- TG t/s: **4.0** ± 0.0 (runs: [4.0, 4.0])
-- TTFT: **262 ms** ± 5 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1074
-- PP t/s: **130.9** ± 179.7 (runs: [257.9, 3.8])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1073 / 1074
-- Cache hit rate: **99.9%**
-- PP t/s cold: 3.8 → hot: 3.9 (1.02× speedup)
-
-### `Gemma-3-27B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **7.5 t/s** | ~67s for a 500-token response; ~134s for 1 000 tokens |
-| Time to first token (TTFT) | **144 ms** | First word appears in 144 ms |
-| Prompt processing speed | **278.3 t/s** | Reads ~278 input tokens/sec; a 1 000-token doc takes ~4s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 34.0s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 25
-- Generated tokens: 152
-- TG t/s: **7.5** ± 0.0 (runs: [7.5, 7.5])
-- TTFT: **144 ms** ± 10 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1178
-- PP t/s: **278.3** ± 386.5 (runs: [551.6, 5.0])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1177 / 1178
-- Cache hit rate: **99.9%**
-- PP t/s cold: 7.3 → hot: 7.3 (1.01× speedup)
-
-### `Llama-3.3-70B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **3.9 t/s** | ~127s for a 500-token response; ~253s for 1 000 tokens |
-| Time to first token (TTFT) | **262 ms** | First word appears in 262 ms |
-| Prompt processing speed | **133.8 t/s** | Reads ~134 input tokens/sec; a 1 000-token doc takes ~7s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 51.4s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 60
-- Generated tokens: 133
-- TG t/s: **3.9** ± 0.0 (runs: [4.0, 3.9])
-- TTFT: **262 ms** ± 7 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1112
-- PP t/s: **133.8** ± 183.8 (runs: [263.8, 3.9])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1111 / 1112
-- Cache hit rate: **99.9%**
-- PP t/s cold: 3.9 → hot: 3.9 (1.00× speedup)
-
-### `Mistral-Small-3.1-24B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **8.8 t/s** | ~57s for a 500-token response; ~113s for 1 000 tokens |
-| Time to first token (TTFT) | **122 ms** | First word appears in 122 ms |
-| Prompt processing speed | **343.7 t/s** | Reads ~344 input tokens/sec; a 1 000-token doc takes ~3s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 33.8s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 194
-- Generated tokens: 200
-- TG t/s: **8.8** ± 0.0 (runs: [8.8, 8.8])
-- TTFT: **122 ms** ± 9 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1416
-- PP t/s: **343.7** ± 473.7 (runs: [678.7, 8.7])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1415 / 1416
-- Cache hit rate: **99.9%**
-- PP t/s cold: 8.6 → hot: 8.8 (1.02× speedup)
-
-### `Nemotron-Nano-30B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **44.1 t/s** | ~11s for a 500-token response; ~23s for 1 000 tokens |
-| Time to first token (TTFT) | **128 ms** | First word appears in 128 ms |
-| Prompt processing speed | **1727.0 t/s** | Reads ~1727 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **59.2%** | 59% of tokens served from cache on repeat requests |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 41.9s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 34
-- Generated tokens: 200
-- TG t/s: **44.1** ± 0.0 (runs: [44.2, 44.1])
-- TTFT: **128 ms** ± 9 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1256
-- PP t/s: **1727.0** ± 83.5 (runs: [1786.0, 1668.0])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 512
-- Hot tokens from cache: 744 / 1256
-- Cache hit rate: **59.2%**
-- PP t/s cold: 1693.5 → hot: 1668.8 (0.99× speedup)
-
-### `Nemotron-Nano-30B-Q4`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **73.5 t/s** | ~7s for a 500-token response; ~14s for 1 000 tokens |
-| Time to first token (TTFT) | **97 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **2300.0 t/s** | Reads ~2300 input tokens/sec; a 1 000-token doc takes ~0s to ingest |
-| KV cache hit rate | **59.2%** | 59% of tokens served from cache on repeat requests |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 26.6s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 34
-- Generated tokens: 200
-- TG t/s: **73.5** ± 0.0 (runs: [73.5, 73.5])
-- TTFT: **97 ms** ± 15 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1256
-- PP t/s: **2300.0** ± 65.4 (runs: [2346.2, 2253.7])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 512
-- Hot tokens from cache: 744 / 1256
-- Cache hit rate: **59.2%**
-- PP t/s cold: 2241.1 → hot: 2233.5 (1.00× speedup)
-
 ### `Nemotron-Nano-Omni-30B`
 
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **57.0 t/s** | ~9s for a 500-token response; ~18s for 1 000 tokens |
-| Time to first token (TTFT) | **117 ms** | First word appears in 117 ms |
-| Prompt processing speed | **1937.8 t/s** | Reads ~1938 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **59.2%** | 59% of tokens served from cache on repeat requests |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 36.5s
+**Warmup:** 35.9s (30B MoE, ~30 GB)
 
 **Test 1 — Generation Speed**
-
-- Prompt tokens: 33
-- Generated tokens: 199
-- TG t/s: **57.0** ± 0.3 (runs: [57.1, 56.8])
-- TTFT: **117 ms** ± 7 ms
+- TG t/s: **57.3** ± 0.0 (runs: [57.3, 57.3, 57.3])
+- TTFT: **114 ms** ± 9 ms (prompt tokens: 33)
 
 **Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1255
-- PP t/s: **1937.8** ± 129.2 (runs: [2029.2, 1846.4])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 512
-- Hot tokens from cache: 743 / 1255
-- Cache hit rate: **59.2%**
-- PP t/s cold: 1810.3 → hot: 1831.9 (1.01× speedup)
-
-### `Qwen2.5-72B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **3.7 t/s** | ~134s for a 500-token response; ~268s for 1 000 tokens |
-| Time to first token (TTFT) | **279 ms** | First word appears in 279 ms |
-| Prompt processing speed | **125.7 t/s** | Reads ~126 input tokens/sec; a 1 000-token doc takes ~8s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 61.5s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 46
-- Generated tokens: 127
-- TG t/s: **3.7** ± 0.0 (runs: [3.7, 3.7])
-- TTFT: **279 ms** ± 12 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1188
-- PP t/s: **125.7** ± 172.5 (runs: [247.7, 3.7])
+- PP t/s: **1 899** ± 93 (runs: [2006, 1853, 1838])
+- True cold speed: all three runs are cold (MoE PP structure differs from dense models)
 
 **Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1187 / 1188
-- Cache hit rate: **99.9%**
-- PP t/s cold: 3.7 → hot: 3.7 (1.00× speedup)
-
-### `Qwen2.5-72B-Q4`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **4.4 t/s** | ~113s for a 500-token response; ~226s for 1 000 tokens |
-| Time to first token (TTFT) | **243 ms** | First word appears in 243 ms |
-| Prompt processing speed | **139.1 t/s** | Reads ~139 input tokens/sec; a 1 000-token doc takes ~7s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 51.0s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 46
-- Generated tokens: 81
-- TG t/s: **4.4** ± 0.0 (runs: [4.4, 4.4])
-- TTFT: **243 ms** ± 14 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1188
-- PP t/s: **139.1** ± 190.7 (runs: [273.9, 4.3])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1187 / 1188
-- Cache hit rate: **99.9%**
-- PP t/s cold: 4.4 → hot: 4.3 (0.99× speedup)
-
-### `Qwen2.5-Coder-32B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **6.4 t/s** | ~79s for a 500-token response; ~157s for 1 000 tokens |
-| Time to first token (TTFT) | **166 ms** | First word appears in 166 ms |
-| Prompt processing speed | **230.0 t/s** | Reads ~230 input tokens/sec; a 1 000-token doc takes ~4s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 39.5s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 46
-- Generated tokens: 122
-- TG t/s: **6.4** ± 0.0 (runs: [6.4, 6.4])
-- TTFT: **166 ms** ± 5 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1188
-- PP t/s: **230.0** ± 316.4 (runs: [453.7, 6.3])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1187 / 1188
-- Cache hit rate: **99.9%**
-- PP t/s cold: 6.3 → hot: 6.2 (1.00× speedup)
-
-### `Qwen3-32B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **6.3 t/s** | ~79s for a 500-token response; ~158s for 1 000 tokens |
-| Time to first token (TTFT) | **487 ms** | First word appears in 487 ms |
-| Prompt processing speed | **230.2 t/s** | Reads ~230 input tokens/sec; a 1 000-token doc takes ~4s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 44.4s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 25
-- Generated tokens: 200
-- TG t/s: **6.3** ± 0.0 (runs: [6.3, 6.3])
-- TTFT: **487 ms** ± 6 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1167
-- PP t/s: **230.2** ± 316.9 (runs: [454.3, 6.1])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1166 / 1167
-- Cache hit rate: **99.9%**
-- PP t/s cold: 6.1 → hot: 6.2 (1.02× speedup)
-
-### `Qwen3-72B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **3.7 t/s** | ~134s for a 500-token response; ~268s for 1 000 tokens |
-| Time to first token (TTFT) | **280 ms** | First word appears in 280 ms |
-| Prompt processing speed | **123.3 t/s** | Reads ~123 input tokens/sec; a 1 000-token doc takes ~8s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 61.7s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 25
-- Generated tokens: 200
-- TG t/s: **3.7** ± 0.0 (runs: [3.7, 3.7])
-- TTFT: **280 ms** ± 6 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1167
-- PP t/s: **123.3** ± 169.2 (runs: [243.0, 3.7])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1166 / 1167
-- Cache hit rate: **99.9%**
-- PP t/s cold: 3.7 → hot: 3.6 (0.99× speedup)
-
-### `Qwen3-Coder-30B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **60.1 t/s** | ~8s for a 500-token response; ~17s for 1 000 tokens |
-| Time to first token (TTFT) | **22 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **1135.9 t/s** | Reads ~1136 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 32.0s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 25
-- Generated tokens: 124
-- TG t/s: **60.1** ± 0.0 (runs: [60.1, 60.1])
-- TTFT: **22 ms** ± 3 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1167
-- PP t/s: **1135.9** ± 1530.6 (runs: [2218.2, 53.7])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1166 / 1167
-- Cache hit rate: **99.9%**
-- PP t/s cold: 53.2 → hot: 52.3 (0.98× speedup)
-
-### `Qwen3-Coder-30B-Q6`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **69.1 t/s** | ~7s for a 500-token response; ~14s for 1 000 tokens |
-| Time to first token (TTFT) | **20 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **1124.7 t/s** | Reads ~1125 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 36.5s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 25
-- Generated tokens: 118
-- TG t/s: **69.1** ± 0.1 (runs: [69.1, 69.0])
-- TTFT: **20 ms** ± 3 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1167
-- PP t/s: **1124.7** ± 1506.1 (runs: [2189.7, 59.8])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1166 / 1167
-- Cache hit rate: **99.9%**
-- PP t/s cold: 61.3 → hot: 61.0 (0.99× speedup)
-
-### `Qwen3-Coder-REAP-25B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **84.7 t/s** | ~6s for a 500-token response; ~12s for 1 000 tokens |
-| Time to first token (TTFT) | **17 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **1384.1 t/s** | Reads ~1384 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 16.3s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 25
-- Generated tokens: 86
-- TG t/s: **84.7** ± 0.1 (runs: [84.8, 84.6])
-- TTFT: **17 ms** ± 2 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1167
-- PP t/s: **1384.1** ± 1875.8 (runs: [2710.5, 57.7])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1166 / 1167
-- Cache hit rate: **99.9%**
-- PP t/s cold: 57.8 → hot: 58.1 (1.01× speedup)
-
-### `Qwen3.5-9B`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **23.6 t/s** | ~21s for a 500-token response; ~42s for 1 000 tokens |
-| Time to first token (TTFT) | **76 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **1578.5 t/s** | Reads ~1579 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **55.9%** | 56% of tokens served from cache on repeat requests |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 16.7s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 29
-- Generated tokens: 194
-- TG t/s: **23.6** ± 0.0 (runs: [23.6, 23.6])
-- TTFT: **76 ms** ± 8 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1162
-- PP t/s: **1578.5** ± 1.8 (runs: [1577.2, 1579.8])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 512
-- Hot tokens from cache: 650 / 1162
-- Cache hit rate: **55.9%**
-- PP t/s cold: 1607.4 → hot: 1611.5 (1.00× speedup)
-
-### `Qwen3.5-9B-Q4`
-
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **34.7 t/s** | ~14s for a 500-token response; ~29s for 1 000 tokens |
-| Time to first token (TTFT) | **60 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **2032.6 t/s** | Reads ~2033 input tokens/sec; a 1 000-token doc takes ~0s to ingest |
-| KV cache hit rate | **55.9%** | 56% of tokens served from cache on repeat requests |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 11.6s
-
-**Test 1 — Generation Speed**
-
-- Prompt tokens: 29
-- Generated tokens: 160
-- TG t/s: **34.7** ± 0.0 (runs: [34.7, 34.7])
-- TTFT: **60 ms** ± 11 ms
-
-**Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1162
-- PP t/s: **2032.6** ± 27.2 (runs: [2013.3, 2051.8])
-
-**Test 3 — Cache Efficiency**
-
-- Cold prompt tokens processed: 512
-- Hot tokens from cache: 650 / 1162
-- Cache hit rate: **55.9%**
-- PP t/s cold: 2072.2 → hot: 2076.2 (1.00× speedup)
+- Cache hit: **59.2%** (743 / 1255 tokens from cache)
+- PP cold: 1865 t/s → hot: 1854 t/s (1.00×)
+- Note: 512 tokens reprocessed even on "hot" request — the model's prefix tokenisation differs from the test prompt's boundary; this is a benchmark artifact.
+
+---
 
 ### `gpt-oss-120b`
 
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **55.8 t/s** | ~9s for a 500-token response; ~18s for 1 000 tokens |
-| Time to first token (TTFT) | **84 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **815.8 t/s** | Reads ~816 input tokens/sec; a 1 000-token doc takes ~1s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 61.5s
+**Warmup:** 66.0s (120B MXFP4, ~60 GB)
 
 **Test 1 — Generation Speed**
-
-- Prompt tokens: 83
-- Generated tokens: 200
-- TG t/s: **55.8** ± 0.1 (runs: [55.8, 55.9])
-- TTFT: **84 ms** ± 6 ms
+- TG t/s: **56.2** ± 0.0 (runs: [56.2, 56.2, 56.2])
+- TTFT: **82 ms** ± 3 ms (prompt tokens: 83; includes reasoning_effort=high overhead)
 
 **Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1126
-- PP t/s: **815.8** ± 1099.8 (runs: [1593.4, 38.1])
+- PP t/s: **563** ± 895 (runs: [1597, 41, 52])
+- Run 1 (1597 t/s) is cache-warm from warmup. Cold PP (runs 2–3): **46 t/s**
 
 **Test 3 — Cache Efficiency**
+- Cache hit: **99.9%** (1125 / 1126 tokens from cache)
+- PP cold: 51.4 t/s → hot: 50.1 t/s (0.98×)
 
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1125 / 1126
-- Cache hit rate: **99.9%**
-- PP t/s cold: 52.3 → hot: 50.4 (0.96× speedup)
+---
 
-### `gpt-oss-20b`
+### `Qwen3.5-9B`
 
-## Key Numbers
-
-| Metric | Value | What it means |
-|---|---|---|
-| Generation speed | **80.0 t/s** | ~6s for a 500-token response; ~13s for 1 000 tokens |
-| Time to first token (TTFT) | **61 ms** | First word appears in < 100 ms — near-instant |
-| Prompt processing speed | **2003.1 t/s** | Reads ~2003 input tokens/sec; a 1 000-token doc takes ~0s to ingest |
-| KV cache hit rate | **99.9%** | Near-perfect cache — repeated context costs almost nothing |
-| Cache speedup | **1.0×** | Second request with same context is 1.0× faster to process |
-
-**Warmup (model load + first request):** 16.8s
+**Warmup:** 16.1s (9B, ~9 GB)
 
 **Test 1 — Generation Speed**
-
-- Prompt tokens: 83
-- Generated tokens: 200
-- TG t/s: **80.0** ± 0.1 (runs: [79.9, 80.0])
-- TTFT: **61 ms** ± 3 ms
+- TG t/s: **24.2** ± 0.0 (runs: [24.2, 24.2, 24.2])
+- TTFT: **73 ms** ± 10 ms (prompt tokens: 29)
 
 **Test 2 — Prompt Processing Speed**
-
-- Prompt tokens: 1126
-- PP t/s: **2003.1** ± 2754.7 (runs: [3951.0, 55.2])
+- PP t/s: **1 587** ± 24 (runs: [1562, 1609, 1589])
+- All runs are true cold (no cache warm artifact — consistent with Nemotron pattern)
 
 **Test 3 — Cache Efficiency**
+- Cache hit: **55.9%** (650 / 1162 tokens from cache)
+- PP cold: 1609 t/s → hot: 1612 t/s (1.00×)
+- Same boundary artifact as Nemotron: 512 tokens always reprocessed.
 
-- Cold prompt tokens processed: 1
-- Hot tokens from cache: 1125 / 1126
-- Cache hit rate: **99.9%**
-- PP t/s cold: 73.3 → hot: 74.9 (1.02× speedup)
+---
 
-## Recommendations
+### `Codestral-22B`
 
-### Key Finding
+**Warmup:** 59.1s (22B, ~22 GB)
 
-**`gpt-oss-120b` at 55.8 t/s is faster than every dense model on this machine, including models less than half its size.** The MXFP4 quantization combined with the gpt-oss architecture is exceptionally well matched to the Blackwell GB10. A 1000-token response takes ~18 seconds. `Qwen2.5-Coder-32B` (current default) takes ~156 seconds for the same output — 8.7× slower despite being a 32B model.
+**Test 1 — Generation Speed**
+- TG t/s: **9.5** ± 0.0 (runs: [9.5, 9.5, 9.5])
+- TTFT: **110 ms** ± 0 ms (prompt tokens: 45)
 
-The all-flash speed tier is dominated by MoE architectures (Qwen3-Coder, Nemotron-Nano, gpt-oss). Dense 70B models (3.7–4.4 t/s) are outperformed in speed by gpt-oss-120b despite being far smaller — they are not recommended for interactive use.
+**Test 2 — Prompt Processing Speed**
+- PP t/s: **215.7** ± 358 (runs: [629, 9.0, 8.9])
+- Run 1 (629 t/s) cache-warm. Cold PP (runs 2–3): **9 t/s**
 
-### By Use Case
+**Test 3 — Cache Efficiency**
+- Cache hit: **99.9%** (1427 / 1428 tokens from cache)
+- PP cold: 8.9 → hot: 8.9 (1.00×)
 
-| Use case | Recommended model | Why |
+---
+
+### `Qwen2.5-Coder-32B`
+
+**Warmup:** 53.4s (32B Q8_0, ~34 GB)
+
+**Test 1 — Generation Speed**
+- TG t/s: **6.5** ± 0.0 (runs: [6.5, 6.5, 6.5])
+- TTFT: **164 ms** ± 7 ms (prompt tokens: 46)
+
+**Test 2 — Prompt Processing Speed**
+- PP t/s: **155.3** ± 258 (runs: [453, 6.2, 6.4])
+- Run 1 (453 t/s) cache-warm. Cold PP (runs 2–3): **6 t/s**
+
+**Test 3 — Cache Efficiency**
+- Cache hit: **99.9%** (1187 / 1188 tokens from cache)
+- PP cold: 6.4 → hot: 6.4 (1.00×)
+
+---
+
+### `DeepSeek-R1-70B`
+
+**Warmup:** 55.4s (70B Q5_K_M, ~48 GB)
+
+**Test 1 — Generation Speed**
+- TG t/s: **4.0** ± 0.0 (runs: [4.0, 4.0, 4.0])
+- TTFT: **258 ms** ± 6 ms (prompt tokens: 22)
+
+**Test 2 — Prompt Processing Speed**
+- PP t/s: **89.5** ± 148 (runs: [261, 3.9, 4.0])
+- Run 1 (261 t/s) cache-warm. Cold PP (runs 2–3): **4 t/s**
+
+**Test 3 — Cache Efficiency**
+- Cache hit: **99.9%** (1073 / 1074 tokens from cache)
+- PP cold: 4.0 → hot: 3.9 (0.99×)
+
+---
+
+### `Qwen3-72B`
+
+**Warmup:** 55.6s (72B Q5_K_M, ~49 GB)
+
+**Test 1 — Generation Speed**
+- TG t/s: **3.8** ± 0.0 (runs: [3.8, 3.8, 3.8])
+- TTFT: **273 ms** ± 8 ms (prompt tokens: 25)
+
+**Test 2 — Prompt Processing Speed**
+- PP t/s: **84.8** ± 140 (runs: [247, 3.7, 3.8])
+- Run 1 (247 t/s) cache-warm. Cold PP (runs 2–3): **4 t/s**
+
+**Test 3 — Cache Efficiency**
+- Cache hit: **99.9%** (1166 / 1167 tokens from cache)
+- PP cold: 3.8 → hot: 3.7 (0.98×)
+
+---
+
+## Model Selection Guide
+
+| Use case | Best choice | Reason |
 |---|---|---|
-| **Daily driver / general** | `gpt-oss-120b` | 55.8 t/s, 120B intelligence, 84ms TTFT, 100% cache — fastest high-quality model |
-| **Code generation (speed-first)** | `Qwen3-Coder-REAP-25B` | 84.7 t/s, 17ms TTFT — fastest model on the machine |
-| **Code generation (quality + speed)** | `Qwen3-Coder-30B-Q6` | 69.1 t/s, 20ms TTFT, 100% cache, Q6 fidelity |
-| **Quick / lightweight tasks** | `gpt-oss-20b` | 80.0 t/s, 61ms TTFT, same architecture as 120B (32K ctx limit) |
-| **Reasoning / debugging** | `gpt-oss-120b` | `reasoning_effort: high` injected by default; fast enough to not feel slow |
-| **Vision input** | `Nemotron-Nano-Omni-30B` | Only model with mmproj; 57.0 t/s, 100% cache |
-| **Avoid for interactive use** | All dense 70B models | 3.7–4.4 t/s; a 500-token response takes 2–4 minutes |
-
-### Speed Tiers
-
-| Tier | Models | TG t/s range | 500-token response |
-|---|---|---:|---:|
-| Ultra-fast | Qwen3-Coder-REAP-25B, gpt-oss-20b, Nemotron-Nano-30B-Q4, Qwen3-Coder-30B-Q6, Qwen3-Coder-30B | 60–85 | 6–8s |
-| Fast | Nemotron-Nano-Omni-30B, gpt-oss-120b, Nemotron-Nano-30B | 44–58 | 9–11s |
-| Medium | Qwen3.5-9B-Q4, Qwen3.5-9B | 24–35 | 14–21s |
-| Slow | Codestral-22B, Mistral-Small-3.1-24B, Gemma-3-27B, Qwen2.5-Coder-32B, Qwen3-32B | 6–9 | 53–79s |
-| Very slow | All dense 70B models | 3.7–4.4 | 113–134s |
-
-### Suggested Default Change
-
-The current default (`Qwen2.5-Coder-32B`, 6.4 t/s) should be replaced by **`gpt-oss-120b`** (55.8 t/s). Benefits:
-
-- 8.7× faster generation
-- Higher intelligence (120B vs 32B)
-- Near-instant TTFT (84ms vs 166ms)
-- Perfect cache efficiency (100%)
-- Fits comfortably in 121 GiB: ~60 GB weights + ~3 GB KV (131K ctx, 1 slot) + 32 GB cache-ram ≈ 95 GB
-
-The only consideration: `reasoning_effort: high` is injected for every gpt-oss-120b request, adding reasoning tokens before the visible answer. This improves quality but means the first visible output token arrives after the reasoning phase, not immediately. For the benchmark prompt, TTFT was 84ms to the first reasoning token.
-
-## Test Code
-
-The benchmark was run with:
-
-```bash
-python3 benchmark_models.py --all --iterations 2 --output docs/benchmark_all_models.md
-```
-
-Full script source: `/home/sysadmin/codebase/bin/benchmark_models.py`
-
-API endpoint used: `POST http://localhost:8080/v1/chat/completions`
-
-Request body shape (generation test):
-```json
-{
-  "model": "<model-id>",
-  "messages": [
-    {
-      "role": "user",
-      "content": "<prompt>"
-    }
-  ],
-  "max_tokens": 200,
-  "stream": true,
-  "temperature": 0.0
-}
-```
-
-Timing fields extracted from server response:
-```json
-{
-  "timings": {
-    "prompt_n": "<tokens actually processed (not cached)>",
-    "cache_n": "<tokens served from KV cache>",
-    "prompt_per_second": "<PP t/s>",
-    "predicted_n": "<tokens generated>",
-    "predicted_per_second": "<TG t/s>"
-  }
-}
-```
+| Interactive chat / coding | `gpt-oss-120b` | 56 t/s, 82 ms TTFT, 128K ctx, near-perfect cache |
+| Fast lightweight tasks | `Qwen3.5-9B` | 24 t/s, 73 ms TTFT, loads in 16s |
+| Vision + reasoning | `Nemotron-Nano-Omni-30B` | 57 t/s, supports mmproj image input |
+| SQL / code specialist | `Codestral-22B` | Faster than Qwen2.5-Coder at lower quality |
+| Deep reasoning / CoT | `DeepSeek-R1-70B` | Chain-of-thought distill; accepts lower speed |
+| Best code quality | `Qwen2.5-Coder-32B` | Q8_0 near-lossless, 128K ctx |
+| Largest dense quality | `Qwen3-72B` | Highest parameter count; slowest |

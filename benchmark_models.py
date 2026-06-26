@@ -698,6 +698,10 @@ def main():
                         help="Runs per test (default: 3)")
     parser.add_argument("--output", metavar="FILE",
                         help="Output markdown file (default: benchmark_<date>.md)")
+    parser.add_argument("--json", metavar="FILE",
+                        help="Also save raw results as JSON (for chart generation)")
+    parser.add_argument("--sleep-between", type=int, default=0, metavar="SECONDS",
+                        help="Sleep N seconds between models (use with globalTTL to ensure clean unload)")
     args = parser.parse_args()
 
     # Resolve model list
@@ -724,10 +728,15 @@ def main():
 
     print(f"\nOutput: {outfile}")
     print(f"Iterations per test: {args.iterations}")
+    if args.sleep_between:
+        print(f"Sleep between models: {args.sleep_between}s")
     print("=" * 60)
 
     all_results = []
-    for model_id in models:
+    for i, model_id in enumerate(models):
+        if i > 0 and args.sleep_between:
+            print(f"\n  Sleeping {args.sleep_between}s to allow previous model to unload ...")
+            time.sleep(args.sleep_between)
         result = benchmark_model(model_id, args.iterations)
         all_results.append(result)
 
@@ -737,8 +746,13 @@ def main():
     md = render_markdown(all_results, args.iterations, args)
     with open(outfile, "w") as f:
         f.write(md)
+    print(f"Markdown report written to: {outfile}")
 
-    print(f"Report written to: {outfile}")
+    if args.json:
+        import json as _json
+        with open(args.json, "w") as f:
+            _json.dump(all_results, f, indent=2)
+        print(f"JSON results written to: {args.json}")
 
     # Print summary to terminal
     ok = [r for r in all_results if r["warmup_ok"] and r["gen"]]

@@ -6,6 +6,8 @@ On this machine it is built from source with CUDA support for the Blackwell GB10
 system binary. llama-swap spawns llama-server instances dynamically to serve models; a separate standalone
 `llama-server.service` is also available for direct single-model use.
 
+[![Stack architecture](images/architecture.jpg)](images/architecture.jpg)
+
 > **Before starting:** Install all required software listed in [`prerequisites.md`](prerequisites.md).
 
 ---

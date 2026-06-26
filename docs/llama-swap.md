@@ -279,7 +279,7 @@ across quality tiers. See [`benchmark_all_models.md`](benchmark_all_models.md) f
 
 ---
 
-## 7. Model Download (model-shelf Layout)
+## 8. Model Download (model-shelf Layout)
 
 Models are stored in the model-shelf layout: `<models_dir>/<org>/<repo>/<file>.gguf`.
 
@@ -301,7 +301,7 @@ After downloading, add the model entry to `/etc/default/llama-swap.yaml` and res
 
 ---
 
-## 8. Systemd Unit — `/etc/systemd/system/llama-swap.service`
+## 9. Systemd Unit — `/etc/systemd/system/llama-swap.service`
 
 > **mlock drop-in required:** `--mlock` is set in `args1`, but systemd's default `LimitMEMLOCK` is 8 MB.
 > Create the drop-in below **before** starting the service, or mlocking will silently fail with a warning.
@@ -367,7 +367,7 @@ sudo systemctl show llama-swap.service | grep LimitMEMLOCK
 
 ---
 
-## 9. Verify
+## 10. Verify
 
 ```bash
 # Health check
@@ -387,7 +387,7 @@ tail -f /var/log/llama/llama-swap.log
 
 ---
 
-## 10. Service Manager Script
+## 11. Service Manager Script
 
 `/home/sysadmin/codebase/bin/init.llama-swap` manages the service:
 

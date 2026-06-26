@@ -84,7 +84,7 @@ All installation and operational guides are in [`docs/`](docs/).
 | [`docs/prerequisites.md`](docs/prerequisites.md) | All required software — install this first. Covers apt packages, CUDA, Go, Docker, Miniforge, and Hugging Face auth. |
 | [`docs/llama-server.md`](docs/llama-server.md) | Build llama.cpp from source with optimised CMake flags for the GB10 (ARM KleidiAI, CUDA FA, LTO), install the binary, configure the standalone systemd service. |
 | [`docs/llama-swap.md`](docs/llama-swap.md) | Install and configure llama-swap — full annotated config YAML, 7 registered models, arg macro reference, model download instructions, systemd unit. |
-| [`docs/openwebui.md`](docs/openwebui.md) | Deploy Open WebUI in Docker, connect to llama-swap, set context windows per model, register MCP tool servers, upgrade procedure. |
+| [`docs/openwebui.md`](docs/openwebui.md) | Deploy Open WebUI in Docker, connect to llama-swap, set context windows per model, register MCP tool servers, configure Firecrawl web search and URL RAG, upgrade procedure. |
 | [`docs/apex-gateway.md`](docs/apex-gateway.md) | Deploy the APEX Gateway proxy — full Python source, systemd unit, Oracle APEX configuration, request flow diagram. |
 | [`docs/Firecrawl.md`](docs/Firecrawl.md) | Self-hosted Firecrawl setup — Docker Compose stack, llama-responses-proxy, AI extraction config, Open WebUI integration. |
 

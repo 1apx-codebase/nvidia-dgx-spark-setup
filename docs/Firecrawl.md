@@ -30,6 +30,112 @@ Firecrawl uses Vercel AI SDK v6 (`@ai-sdk/openai` v3), which sends all structure
 
 ---
 
+## Fresh Install
+
+### 1. Clone the Firecrawl repo
+
+```bash
+cd ~/codebase
+git clone https://github.com/mendableai/firecrawl
+cd firecrawl
+```
+
+### 2. Switch to pre-built images (no local build)
+
+Edit `docker-compose.yaml` — comment out the three `build:` lines and uncomment the `image:` lines for the Firecrawl-specific services:
+
+```bash
+# x-common-service block: comment out build, uncomment image
+sed -i 's|^  # image: ghcr.io/firecrawl/firecrawl|  image: ghcr.io/firecrawl/firecrawl|' docker-compose.yaml
+sed -i 's|^  build: apps/api|  # build: apps/api|' docker-compose.yaml
+
+# playwright-service: comment out build, uncomment image
+sed -i 's|^    # image: ghcr.io/firecrawl/playwright-service:latest|    image: ghcr.io/firecrawl/playwright-service:latest|' docker-compose.yaml
+sed -i 's|^    build: apps/playwright-service-ts|    # build: apps/playwright-service-ts|' docker-compose.yaml
+
+# nuq-postgres: comment out build, uncomment image
+sed -i 's|^    # image: ghcr.io/firecrawl/nuq-postgres:latest|    image: ghcr.io/firecrawl/nuq-postgres:latest|' docker-compose.yaml
+sed -i 's|^    build: apps/nuq-postgres|    # build: apps/nuq-postgres|' docker-compose.yaml
+```
+
+Alternatively edit manually — look for the three `build:` directives and swap them for `image:` as documented in the [Docker Compose Stack](#docker-compose-stack) section below.
+
+### 3. Create the `.env` file
+
+```bash
+cat > ~/codebase/firecrawl/.env << 'EOF'
+PORT=3002
+HOST=0.0.0.0
+USE_DB_AUTHENTICATION=false
+BULL_AUTH_KEY=CHANGEME
+
+# AI extraction — routed through llama-responses-proxy → llama-swap
+OPENAI_BASE_URL=http://host.docker.internal:8090/v1
+OPENAI_API_KEY=not-needed
+MODEL_NAME=gpt-oss-120b
+EOF
+```
+
+### 4. Install the llama-responses-proxy
+
+The proxy translates Firecrawl's Responses API calls into Chat Completions for llama-swap.
+
+```bash
+# The script is already in the bin repo — just install the systemd unit
+sudo tee /etc/systemd/system/llama-responses-proxy.service > /dev/null << 'EOF'
+[Unit]
+Description=llama Responses API → Chat Completions proxy (Firecrawl compat)
+After=network.target llama-swap.service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/sysadmin/codebase/bin/llama-responses-proxy.py
+Restart=always
+User=sysadmin
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable llama-responses-proxy.service
+```
+
+### 5. Start the stack
+
+```bash
+init.firecrawl start
+```
+
+This starts the proxy first, then the Docker Compose stack. Verify with:
+
+```bash
+init.firecrawl status
+```
+
+The API health check should return `200 OK` within ~30 seconds as containers initialise.
+
+### 6. Test
+
+```bash
+# Basic scrape
+curl -s http://localhost:3002/v2/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com","formats":["markdown"]}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('ok:', d['success'], '— chars:', len(d['data']['markdown']))"
+
+# AI extraction
+curl -s http://localhost:3002/v2/scrape \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "formats": [{"type":"json","prompt":"Extract the page title.",
+      "schema":{"type":"object","additionalProperties":false,
+        "required":["title"],"properties":{"title":{"type":"string"}}}}]
+  }' | python3 -c "import sys,json; d=json.load(sys.stdin); print('json:', d['data']['json'])"
+```
+
+---
+
 ## Locations
 
 | Item | Path |

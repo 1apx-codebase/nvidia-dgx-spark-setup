@@ -27,7 +27,7 @@ python3 benchmark_models.py --models gpt-oss-120b
 # Benchmark multiple specific models
 python3 benchmark_models.py --models gpt-oss-120b Qwen3-32B Qwen2.5-Coder-32B
 
-# Benchmark all 21 registered models (loads each in turn — takes a long time)
+# Benchmark all 7 registered models (loads each in turn — takes a long time)
 python3 benchmark_models.py --all
 ```
 

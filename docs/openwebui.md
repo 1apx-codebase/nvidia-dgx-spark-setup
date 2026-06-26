@@ -7,8 +7,8 @@ pinned to a specific release tag, managed by a systemd service. It connects to l
 
 [![Open WebUI integration](images/openwebui-integration.jpg)](images/openwebui-integration.jpg)
 
-- **Version:** v0.9.5
-- **Image:** `ghcr.io/open-webui/open-webui:v0.9.5`
+- **Version:** v0.9.6
+- **Image:** `ghcr.io/open-webui/open-webui:v0.9.6`
 - **URL:** `http://<host-ip>:3000`
 - **Data volume:** Docker named volume `openwebui` → `/var/lib/docker/volumes/openwebui/_data`
 
@@ -48,7 +48,7 @@ Pin to the exact version tag rather than `main` or `latest` to prevent unintende
 on service restarts.
 
 ```bash
-docker pull ghcr.io/open-webui/open-webui:v0.9.5
+docker pull ghcr.io/open-webui/open-webui:v0.9.6
 ```
 
 Verify the image is present:
@@ -102,7 +102,7 @@ ExecStartPre=-/usr/bin/docker rm openwebui
 ExecStart=/usr/bin/docker run --name openwebui \
     -p 3000:8080 \
     -v openwebui:/app/backend/data \
-    ghcr.io/open-webui/open-webui:v0.9.5
+    ghcr.io/open-webui/open-webui:v0.9.6
 
 ExecStop=/usr/bin/docker stop openwebui
 ExecStopPost=/usr/bin/docker rm openwebui
@@ -144,7 +144,7 @@ docker inspect openwebui --format '{{.State.Health.Status}}'
 
 # API responds
 curl -s http://localhost:3000/api/version
-# → {"version":"0.9.5","deployment_id":""}
+# → {"version":"0.9.6","deployment_id":""}
 
 # HTTP health endpoint
 curl -o /dev/null -w "%{http_code}" http://localhost:3000/health

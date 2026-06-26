@@ -102,6 +102,13 @@ printf "${CYAN}${LINE}${RESET}\n"
 print_service "llama-swap"              "llama-swap.service"              "8080"  "http://localhost:8080/v1/models"
 printf "${DIM}  ${THIN}${RESET}\n"
 print_service "openwebui"               "openwebui.service"               "3000"  "http://localhost:3000/health"
+owui_docker=$(docker ps --filter "name=^openwebui$" \
+    --format "{{.Image}}   up {{.RunningFor}}   {{.Status}}" 2>/dev/null)
+if [[ -n "$owui_docker" ]]; then
+    printf "${DIM}  %-20s  docker  %s${RESET}\n" "" "$owui_docker"
+else
+    printf "${DIM}  %-20s  docker  ${RED}container not found${RESET}\n" ""
+fi
 printf "${DIM}  ${THIN}${RESET}\n"
 print_service "apex-gateway"            "apex-gateway.service"            "8766"  "" "skip"
 printf "${DIM}  ${THIN}${RESET}\n"
@@ -127,14 +134,14 @@ else
     printf "  ${BOLD}%-20s${RESET}  ${RED}${BOLD}STOPPED${RESET}   port ${RED}:3002 (not responding)${RESET}   health ${RED}%s${RESET}\n" "firecrawl" "${fc_health:-no conn}"
 fi
 
-docker compose -f /home/sysadmin/codebase/firecrawl/docker-compose.yaml ps \
-    --format "table {{.Name}}\t{{.Status}}" 2>/dev/null \
-    | tail -n +2 \
-    | while IFS=$'\t' read -r name status; do
+docker ps --filter "name=firecrawl" \
+    --format "{{.Names}}\t{{.Image}}\t{{.RunningFor}}\t{{.Status}}" 2>/dev/null \
+    | while IFS=$'\t' read -r name image ran status; do
+        info="${image}   up ${ran}   ${status}"
         if [[ "$status" == *"Up"* ]]; then
-            printf "  ${DIM}  %-38s  ${GREEN}%s${RESET}\n" "$name" "$status"
+            printf "${DIM}  %-34s  docker  ${GREEN}%s${RESET}\n" "$name" "$info"
         else
-            printf "  ${DIM}  %-38s  ${RED}%s${RESET}\n" "$name" "$status"
+            printf "${DIM}  %-34s  docker  ${RED}%s${RESET}\n" "$name" "$info"
         fi
     done
 

@@ -34,7 +34,7 @@
   <rect x="120" y="270" width="300" height="72" rx="10" fill="#2d1f3d" stroke="#a855f7" stroke-width="1.5"/>
   <text x="270" y="295" text-anchor="middle" font-size="14" font-weight="700" fill="#d8b4fe">Open WebUI  (Docker)</text>
   <text x="270" y="314" text-anchor="middle" font-size="11" fill="#c084fc">chat interface · model management</text>
-  <text x="270" y="330" text-anchor="middle" font-size="10" fill="#a78bfa">tool calling · v0.9.5</text>
+  <text x="270" y="330" text-anchor="middle" font-size="10" fill="#a78bfa">tool calling · v0.9.6</text>
 
   <!-- Arrow 3 -->
   <line x1="270" y1="342" x2="270" y2="374" stroke="#475569" stroke-width="1.5" stroke-dasharray="4 3"/>
